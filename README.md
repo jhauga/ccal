@@ -96,5 +96,12 @@ Add two numbers:
 
 Perform a complex equation:
 
+    > ccal ( ( 34 x 11 ) / ( 10 - 5 ) ) - ( 4 x 53 x ( 30 / 10 ) )
+    > -561.2
+
+**NOTE** - issue with order of operations, so something such as:
+
     > ccal ( ( 34 x 11 ) / [ 10 - 5 ] ) - ( 4 x 53 x ( 30 / 10 ) + ( 2 x ( 40 - 20 ) ) ) / ( 8 x 6 x ( 12 / 2 ) + 4 )
     > -2.0589
+
+will be incorrect.
