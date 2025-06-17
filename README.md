@@ -82,7 +82,7 @@ gcc ccal.c -o ccal.exe
 
 ## Command Line Usage:
 
-To use as a command line tool, pass digits, arithmetic operators, and nesting characters 
+To use as a command line tool; pass digits, arithmetic operators, and nesting characters 
 (`(`, `)`, `{`, `}`, `[`, `]`) separated with a space.
 
 **IMPORTANT NOTE** - use `x` instead of `*` for multiplcation.
