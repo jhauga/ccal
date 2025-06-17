@@ -50,15 +50,26 @@ then select it, click next, and finish the install process.
 
 ## Compile GUI:
 
-### Simpliest Method:
+### Clone Repo:
 
-This compiles without any resources.
+First clone this repository, and change into the directory:
+
+```
+git clone https://github.com/jhauga/ccal.git
+cd ccal
+```
+
+### Simpliest Compile Method:
+
+This compiles without any resources:
 
 ```
 gcc -DBUILDING_GUI ccal.c ccal_gui.c -o ccal_gui.exe -mwindows
 ```
 
-### Include Resources:
+and done.
+
+### Compile Including Resources:
 
 Compile with resources (*app icon*).
 
@@ -68,17 +79,23 @@ Compile `.rc` to get a `.res` object.
 windres ccal_gui.rc -O coff -o ccal_gui.res
 ```
 
-Build, linking resource object.
+Then - build, linking resource object:
 
 ```
 gcc -DBUILDING_GUI ccal_gui.c ccal.c ccal_gui.res -o ccal_gui.exe -mwindows
 ```
 
+and done.
+
 ## Compile Command Line Tool:
+
+To use the command line tool, compile engine ccal.c:
 
 ```
 gcc ccal.c -o ccal.exe
 ```
+
+and done.
 
 ## Command Line Usage:
 
