@@ -55,6 +55,17 @@ then select it, click next, and finish the install process.
 
 **NOTE** - Compatible with Mac OS, Linux, and Windows.
 
+### Clone Repo:
+
+First clone this repository, and change into the directory:
+
+```
+git clone https://github.com/jhauga/ccal.git
+cd ccal
+```
+
+### Compile:
+
 To use the command line tool, compile engine ccal.c:
 
 ```
@@ -76,7 +87,7 @@ git clone https://github.com/jhauga/ccal.git
 cd ccal
 ```
 
-### Simpliest Compile Method:
+### Compile Without Resources:
 
 This compiles without any resources:
 
