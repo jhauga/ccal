@@ -126,6 +126,7 @@ double parse_expr(int* error) {
 
 // GUI APPLICATION - MAIN FUNCTION:
 //////////////////////////////////////////////////////////////////////////////
+
 // Evaluates an expression string and returns result. If error occurs, 
 // *error is set to 1.
 double evaluate_expr_string(const char* expr, int* error) {
@@ -148,19 +149,23 @@ double evaluate_expr_string(const char* expr, int* error) {
 // COMMAND LINE TOOL - SUPPORT FUNCTIONS:
 //////////////////////////////////////////////////////////////////////////////
 
+// Check if parameter passed is operator.
 int is_operator(const char* s) {
     return (strcmp(s, "+") == 0 || strcmp(s, "-") == 0 ||
         strcmp(s, "x") == 0 || strcmp(s, "/") == 0);
 }
 
+// Handle opening nest characters.
 int is_open_paren(const char* s) {
     return (strcmp(s, "(") == 0 || strcmp(s, "[") == 0 || strcmp(s, "{") == 0);
 }
 
+// Handle closing nest characters.
 int is_close_paren(const char* s) {
     return (strcmp(s, ")") == 0 || strcmp(s, "]") == 0 || strcmp(s, "}") == 0);
 }
 
+// Ensure nest characters match.
 int paren_match(const char* open, const char* close) {
     return (strcmp(open, "(") == 0 && strcmp(close, ")") == 0) ||
         (strcmp(open, "[") == 0 && strcmp(close, "]") == 0) ||
@@ -240,6 +245,8 @@ double evaluate(int argc, char* argv[], int* error) {
 // COMMAND LINE TOOL - MAIN FUNCTION:
 //////////////////////////////////////////////////////////////////////////////
 
+// If not compiling GUI with:
+// gcc -DBUILDING_GUI ccal.c ccal_gui.c -o ccal_gui.exe -mwindows
 #ifndef BUILDING_GUI
 int main(int argc, char* argv[]) {
     if (argc < 2) {

@@ -19,7 +19,7 @@ extern double evaluate_expr_string(const char* expr, int* error);
 #define ID_OUTPUT  2
 #define ID_EQUAL   3
 
-HWND hInput, hOutput;  // handles to input and output controls
+HWND hwnd, hInput, hOutput;  // handles to input and output controls
 WNDPROC DefaultEditProc;
 
 #define BTN_COUNT 20
@@ -80,6 +80,26 @@ void FocusOnInput() {
 void FocusOnOutput() {
     SetFocus(hOutput);
     // AppendText(hInput, "", 0);
+}
+
+// Copy logic to get results copied to clipboard on ctrl + c.
+void copyResults() {
+    // ctrl+C from system (focused window)
+    char val[255];
+    FocusOnOutput();
+    GetWindowText(hOutput, val, sizeof(val));
+    if (val[0] != '\0' && strcmp(val, "Error") != 0) {
+        const size_t len = strlen(val) + 1;
+        HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, len);
+        if (hMem) {
+            memcpy(GlobalLock(hMem), val, len);
+            GlobalUnlock(hMem);
+            OpenClipboard(hwnd);
+            EmptyClipboard();
+            SetClipboardData(CF_TEXT, hMem);
+            CloseClipboard();
+        }
+    }    
 }
 
 // Main window procedure to handle events
@@ -165,22 +185,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         // handle button press
         case WM_COMMAND: {
             if (HIWORD(wParam) == 0 && LOWORD(wParam) == WM_COPY) {
-                // ctrl+C from system (focused window)
                 char val[255];
-                FocusOnOutput();
-                GetWindowText(hOutput, val, sizeof(val));
-                if (val[0] != '\0' && strcmp(val, "Error") != 0) {
-                    const size_t len = strlen(val) + 1;
-                    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, len);
-                    if (hMem) {                        
-                        memcpy(GlobalLock(hMem), val, len);
-                        GlobalUnlock(hMem);
-                        OpenClipboard(hwnd);
-                        EmptyClipboard();
-                        SetClipboardData(CF_TEXT, hMem);
-                        CloseClipboard();
-                    }
-                }
+                copyResults();
                 return 0;
             }
             char key = (char)wParam;
@@ -272,20 +278,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_KEYDOWN: {
             if ((GetKeyState(VK_CONTROL) & 0x8000) && wParam == 'C') {
                 char val[255];
-                FocusOnOutput();
-                GetWindowText(hOutput, val, sizeof(val));
-                if (val[0] != '\0' && strcmp(val, "Error") != 0) {
-                    const size_t len = strlen(val) + 1;
-                    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, len);
-                    if (hMem) {                        
-                        memcpy(GlobalLock(hMem), val, len);
-                        GlobalUnlock(hMem);
-                        OpenClipboard(hwnd);
-                        EmptyClipboard();
-                        SetClipboardData(CF_TEXT, hMem);
-                        CloseClipboard();
-                    }
-                }
+                copyResults();
                 return 0;
             }
             break;
