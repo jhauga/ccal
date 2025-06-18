@@ -1,6 +1,6 @@
 # ccal
 
-Simple GUI and command line calculator, allowing for arithmetic equations.
+Simple GUI (*Windows OS only*) and command line calculator, allowing for arithmetic equations.
 This project was mainly utilized to learn `c`, but turned out to be pretty 
 useful as it allows for long mathmematicl expressions.
 
@@ -11,6 +11,8 @@ For Apple, Linux, and Windows the GNU compile tool `gcc` is required.
 
 ### Apple:
 
+**NOTE** - command line tool only.
+
 Using `Homebrew` to install.
 
 ```
@@ -18,6 +20,8 @@ brew install gcc
 ```
 
 ### Linux:
+
+**NOTE** - command line tool only.
 
 Using common distro package manager `apt`.
 
@@ -47,8 +51,21 @@ then follow the prompts until you reach the "Select Packages" window of the GUI 
 **NOTE** - if you do not see the `gcc-core` package in the results, perform a search for `gcc-core`,
 then select it, click next, and finish the install process.
 
+## Compile Command Line Tool:
+
+**NOTE** - Compatible with Mac OS, Linux, and Windows.
+
+To use the command line tool, compile engine ccal.c:
+
+```
+gcc ccal.c -o ccal.exe
+```
+
+and done.
 
 ## Compile GUI:
+
+**NOTE** - Compatible with Windows only.
 
 ### Clone Repo:
 
@@ -83,16 +100,6 @@ Then - build, linking resource object:
 
 ```
 gcc -DBUILDING_GUI ccal_gui.c ccal.c ccal_gui.res -o ccal_gui.exe -mwindows
-```
-
-and done.
-
-## Compile Command Line Tool:
-
-To use the command line tool, compile engine ccal.c:
-
-```
-gcc ccal.c -o ccal.exe
 ```
 
 and done.

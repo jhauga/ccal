@@ -230,7 +230,7 @@ double evaluate(int argc, char* argv[], int* error) {
 #ifndef BUILDING_GUI
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        printf("Usage: %s num1 op num2 [op num3 ...] — use (), [], {} for grouping.\n", argv[0]);
+        printf("Usage: %s num1 op num2 [op num3 ...] - use (), [], {} for grouping.\n", argv[0]);
         return 1;
     }
 
