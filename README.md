@@ -1,4 +1,4 @@
-# ccal
+# ccal![repo icon](assets/icon.png)
 
 Simple GUI (*Windows OS only*) and command line calculator, allowing for arithmetic equations.
 This project was mainly utilized to learn `C`, but turned out to be pretty useful as it allows 
