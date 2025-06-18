@@ -1,8 +1,8 @@
 # ccal
 
 Simple GUI (*Windows OS only*) and command line calculator, allowing for arithmetic equations.
-This project was mainly utilized to learn `c`, but turned out to be pretty 
-useful as it allows for long mathmematicl expressions.
+This project was mainly utilized to learn `C`, but turned out to be pretty useful as it allows 
+for long mathematical expressions.
 
 ## Requirements:
 
@@ -76,7 +76,7 @@ git clone https://github.com/jhauga/ccal.git
 cd ccal
 ```
 
-### Simpliest Compile Method:
+### Simplest Compile Method: 
 
 This compiles without any resources:
 
@@ -113,7 +113,9 @@ To use as a command line tool; pass digits, arithmetic operators, and nesting ch
 
 ### Command Line Use Examples:
 
-**NOTE** - if errors occure with nest characters, escape or wrap in double quotes.
+**NOTE** - if errors occur with nest characters, escape or wrap in double quotes. 
+
+**NOTE** - best to use `[` and `]` as nest characters
 
 Add two numbers:
 
@@ -122,12 +124,18 @@ Add two numbers:
 
 Perform a complex equation:
 
-    > ccal ( ( 34 x 11 ) / ( 10 - 5 ) ) - ( 4 x 53 x ( 30 / 10 ) )
+    > ccal [ [ 34 x 11 ] / [ 10 - 5 ] ] - [ 4 x 53 x [ 30 / 10 ] ]
     > -561.2
 
 **NOTE** - issue with order of operations, so something such as:
 
-    > ccal ( ( 34 x 11 ) / [ 10 - 5 ] ) - ( 4 x 53 x ( 30 / 10 ) + ( 2 x ( 40 - 20 ) ) ) / ( 8 x 6 x ( 12 / 2 ) + 4 )
+    > ccal [ [ 34 x 11 ] / [ 10 - 5 ] ] - [ 4 x 53 x [ 30 / 10 ] + [ 2 x [ 40 - 20 ] ] ] / [ 8 x 6 x [ 12 / 2 ] + 4 ]
     > -2.0589
 
-will be incorrect.
+will be incorrect (*correct is `72.4849`*). So instead, apply nest characters to force the correct
+order of operations:
+
+    > ccal [ [ 34 x 11 ] / [ 10 - 5 ] ] - [ [ [ 4 x 53 ] x [ 30 / 10 ] + [ 2 x [ 40 - 20 ] ] ] / [ 8 x 6 x [ 12 / 2 ] + 4 ] ]
+    > 72.4849
+
+in order to get the correct answer.

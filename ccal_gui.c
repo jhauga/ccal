@@ -76,6 +76,12 @@ void FocusOnInput() {
     AppendText(hInput, "", 0);
 }
 
+// Set focus on output area to allow copy.
+void FocusOnOutput() {
+    SetFocus(hOutput);
+    // AppendText(hInput, "", 0);
+}
+
 // Main window procedure to handle events
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
@@ -86,6 +92,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
                 10, 10, 380, 25,
                 hwnd, (HMENU)ID_INPUT, NULL, NULL);
+            
+            // behave more like a label
+            SendMessage(hOutput, EM_SETREADONLY, TRUE, 0);
 
             // create output static text control
             hOutput = CreateWindow("STATIC", "",
@@ -155,6 +164,25 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
         // handle button press
         case WM_COMMAND: {
+            if (HIWORD(wParam) == 0 && LOWORD(wParam) == WM_COPY) {
+                // ctrl+C from system (focused window)
+                char val[255];
+                FocusOnOutput();
+                GetWindowText(hOutput, val, sizeof(val));
+                if (val[0] != '\0' && strcmp(val, "Error") != 0) {
+                    const size_t len = strlen(val) + 1;
+                    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, len);
+                    if (hMem) {                        
+                        memcpy(GlobalLock(hMem), val, len);
+                        GlobalUnlock(hMem);
+                        OpenClipboard(hwnd);
+                        EmptyClipboard();
+                        SetClipboardData(CF_TEXT, hMem);
+                        CloseClipboard();
+                    }
+                }
+                return 0;
+            }
             char key = (char)wParam;
             if (LOWORD(wParam) >= 10 && LOWORD(wParam) <= 19) {
                 // digit buttons clicked: append digit to input
@@ -240,6 +268,66 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
             break;
         }
+        // allow copy computed equation to clipboard
+        case WM_KEYDOWN: {
+            if ((GetKeyState(VK_CONTROL) & 0x8000) && wParam == 'C') {
+                char val[255];
+                FocusOnOutput();
+                GetWindowText(hOutput, val, sizeof(val));
+                if (val[0] != '\0' && strcmp(val, "Error") != 0) {
+                    const size_t len = strlen(val) + 1;
+                    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, len);
+                    if (hMem) {                        
+                        memcpy(GlobalLock(hMem), val, len);
+                        GlobalUnlock(hMem);
+                        OpenClipboard(hwnd);
+                        EmptyClipboard();
+                        SetClipboardData(CF_TEXT, hMem);
+                        CloseClipboard();
+                    }
+                }
+                return 0;
+            }
+            break;
+        }
+        // ensure ctrl + c gets equated results
+        case WM_HOTKEY: {
+            if (wParam == 1) {
+                // same clipboard copy logic
+                char val[255];
+                GetWindowText(hOutput, val, sizeof(val));
+                if (val[0] != '\0' && strcmp(val, "Error") != 0) {
+                    const size_t len = strlen(val) + 1;
+                    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, len);
+                    if (hMem) {
+                        memcpy(GlobalLock(hMem), val, len);
+                        GlobalUnlock(hMem);
+                        OpenClipboard(hwnd);
+                        EmptyClipboard();
+                        SetClipboardData(CF_TEXT, hMem);
+                        CloseClipboard();
+                    }
+                }
+                return 0;
+            }
+            break;
+        }
+        // allow ctrl + c when prompt focus
+        case WM_SETFOCUS: {
+            RegisterHotKey(hwnd, 1, MOD_CONTROL, 'C');
+            break;
+        }
+        // allow ctrl + c when other program focus
+        case WM_ACTIVATE: {
+            if (LOWORD(wParam) == WA_ACTIVE || LOWORD(wParam) == WA_CLICKACTIVE) {
+                // Window is active — register hotkey
+                RegisterHotKey(hwnd, 1, MOD_CONTROL, 'C');
+            } else if (LOWORD(wParam) == WA_INACTIVE) {
+                // Window is not active — unregister hotkey
+                UnregisterHotKey(hwnd, 1);
+            }
+            break;
+        }
         // handle keyboard input
         case WM_CHAR: {
             // handle keyboard input for digits, decimal point, operators, and brackets
@@ -293,6 +381,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
         // exit gui on error
         case WM_DESTROY: {
+            UnregisterHotKey(hwnd, 1);
             PostQuitMessage(0);  // exit message loop
             break;
         }
@@ -324,6 +413,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdSh
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 400, 300, // width, height
         NULL, NULL, hInst, NULL);
+    
     if (!hwnd) return 1;
 
     // show and update window

@@ -24,7 +24,11 @@ double parse_expr(int* error);
 double parse_term(int* error);
 double parse_factor(int* error);
 
-// GUI USEAGE:
+/*****************************************************************************
+*  GUI APPLICATION USEAGE:                                                   *
+*****************************************************************************/
+
+// GUI APPLICATION - SUPPORT FUNCTIONS:
 //////////////////////////////////////////////////////////////////////////////
 
 // Parse a number from the expression.
@@ -120,8 +124,10 @@ double parse_expr(int* error) {
     return left;
 }
 
-// Public function: evaluates an expression string and returns result.
-// If error occurs, *error is set to 1.
+// GUI APPLICATION - MAIN FUNCTION:
+//////////////////////////////////////////////////////////////////////////////
+// Evaluates an expression string and returns result. If error occurs, 
+// *error is set to 1.
 double evaluate_expr_string(const char* expr, int* error) {
     *error = 0;
     expr_ptr = expr;  // initialize global pointer to start of expression
@@ -135,7 +141,11 @@ double evaluate_expr_string(const char* expr, int* error) {
     return result;
 }
 
-// COMMAND LINE USEAGE:
+/*****************************************************************************
+*  COMMAND LINE TOOL USEAGE:                                                 *
+*****************************************************************************/
+
+// COMMAND LINE TOOL - SUPPORT FUNCTIONS:
 //////////////////////////////////////////////////////////////////////////////
 
 int is_operator(const char* s) {
@@ -226,6 +236,9 @@ double evaluate(int argc, char* argv[], int* error) {
     }
     return result;
 }
+
+// COMMAND LINE TOOL - MAIN FUNCTION:
+//////////////////////////////////////////////////////////////////////////////
 
 #ifndef BUILDING_GUI
 int main(int argc, char* argv[]) {
