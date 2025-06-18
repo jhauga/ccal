@@ -113,6 +113,8 @@ To use as a command line tool; pass digits, arithmetic operators, and nesting ch
 
 ### Command Line Use Examples:
 
+**NOTE** - if errors occure with nest characters, escape or wrap in double quotes.
+
 Add two numbers:
 
     > ccal 1 + 1
