@@ -130,12 +130,25 @@ Perform a complex equation:
 **NOTE** - issue with order of operations, so something such as:
 
     > ccal [ [ 34 x 11 ] / [ 10 - 5 ] ] - [ 4 x 53 x [ 30 / 10 ] + [ 2 x [ 40 - 20 ] ] ] / [ 8 x 6 x [ 12 / 2 ] + 4 ]
-    > -2.0589
+    > -2.058904109589041
 
 will be incorrect (*correct is `72.4849`*). So instead, apply nest characters to force the correct
 order of operations:
 
     > ccal [ [ 34 x 11 ] / [ 10 - 5 ] ] - [ [ [ 4 x 53 ] x [ 30 / 10 ] + [ 2 x [ 40 - 20 ] ] ] / [ 8 x 6 x [ 12 / 2 ] + 4 ] ]
-    > 72.4849
+    > 72.48493150684931
 
 in order to get the correct answer.
+
+**NOTE** - terminal handling of command line arugments requires numbers with commas to be wrapped
+in double quotes. So instead of:
+
+    > ccal 1,000 - 1
+    > Error: Invalid expression
+
+use:
+
+    > ccal "1,000" - 1
+    > 999
+
+to get the correct calculation.

@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include "remove_commas.h"
 
 // GLOBAL ELEMENTS:
 //////////////////////////////////////////////////////////////////////////////
@@ -24,6 +25,16 @@ double parse_expr(int* error);
 double parse_term(int* error);
 double parse_factor(int* error);
 
+// GLOBAL FUNCTION - Remove commas in-place.
+void remove_commas(char* s) {
+    char* d = s;
+    while (*s) {
+        if (*s != ',') *d++ = *s;
+        s++;
+    }
+    *d = '\0';
+}
+
 /*****************************************************************************
 *  GUI APPLICATION USEAGE:                                                   *
 *****************************************************************************/
@@ -36,7 +47,7 @@ double parse_number(int* error) {
     skip_spaces();
     char* end;
     double val = strtod(expr_ptr, &end);  // convert string to double
-    if (end == expr_ptr) {  // no number found
+    if (end == expr_ptr) {                // no number found
         *error = 1;
         return 0;
     }
@@ -48,7 +59,7 @@ double parse_number(int* error) {
 double parse_paren(int* error) {
     skip_spaces();
     if (*expr_ptr == '(' || *expr_ptr == '[' || *expr_ptr == '{') {
-        char open = *expr_ptr++;  // remember opening bracket and move forward
+        char open = *expr_ptr++;         // remember opening bracket and move forward
         double val = parse_expr(error);  // recursively parse inner expression
         skip_spaces();
         char close = *expr_ptr;
@@ -233,8 +244,10 @@ double evaluate(int argc, char* argv[], int* error) {
         *error = 1;
         return 0;
     }
+
     int index = 0;
     double result = parse_expr_eval(&index, argv, argc, error);
+
     if (index != argc) {
         *error = 1;
         return 0;
@@ -254,14 +267,37 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    // duplicate argv[1..argc-1] and clean commas
+    char** cleaned_args = malloc((argc - 1) * sizeof(char*));
+    if (!cleaned_args) {
+        fprintf(stderr, "Memory error\n");
+        return 1;
+    }
+
+    for (int i = 0; i < argc - 1; ++i) {
+        cleaned_args[i] = strdup(argv[i + 1]);
+        if (!cleaned_args[i]) {
+            fprintf(stderr, "Memory error\n");
+            return 1;
+        }
+        remove_commas(cleaned_args[i]);
+    }
+
     int error;
-    double result = evaluate(argc - 1, &argv[1], &error);
+    double result = evaluate(argc - 1, cleaned_args, &error);
+
+    // Free memory
+    for (int i = 0; i < argc - 1; ++i) {
+        free(cleaned_args[i]);
+    }
+
     if (error) {
         printf("Error: Invalid expression\n");
         return 1;
     }
 
-    printf("%g\n", result);
+    printf("%.16g\n", result);  // full precision, no rounding up
     return 0;
 }
 #endif
+

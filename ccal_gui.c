@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "resource.h"
+#include "remove_commas.h"
 
 // Declare the external evaluate function implemented in calc.c
 extern double evaluate_expr_string(const char* expr, int* error);
@@ -56,13 +57,14 @@ LRESULT CALLBACK InputProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         equ = 1;
         char buffer[256];
         GetWindowText(hWnd, buffer, sizeof(buffer));
+        remove_commas(buffer);  // strip commas
         int error;
         double result = evaluate_expr_string(buffer, &error);
         if (error)
             SetWindowText(hOutput, "Error");
         else {
             char result_str[64];
-            snprintf(result_str, sizeof(result_str), "%.6g", result);
+            snprintf(result_str, sizeof(result_str), "%.16g", result);
             SetWindowText(hOutput, result_str);
         }
         return 0; // handled
@@ -224,6 +226,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 equ = 1;
                 char buffer[256];
                 GetWindowText(hInput, buffer, sizeof(buffer));
+                remove_commas(buffer);  // strip commas
                 int error;
                 double result = evaluate_expr_string(buffer, &error);
                 if (error) {
@@ -232,7 +235,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 }
                 else {
                     char result_str[64];
-                    snprintf(result_str, sizeof(result_str), "%.6g", result);
+                    snprintf(result_str, sizeof(result_str), "%.16g", result);
                     SetWindowText(hOutput, result_str);  // show result
                     FocusOnInput();
                 }
@@ -358,13 +361,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 // "=" clicked: evaluate expression in input box
                 char buffer[256];
                 GetWindowText(hInput, buffer, sizeof(buffer));
+                remove_commas(buffer);  // strip commas
                 int error;
                 double result = evaluate_expr_string(buffer, &error);
                 if (error)
                     SetWindowText(hOutput, "Error");  // show error message
                 else {
                     char result_str[64];
-                    snprintf(result_str, sizeof(result_str), "%.6g", result);
+                    snprintf(result_str, sizeof(result_str), "%.16g", result);
                     SetWindowText(hOutput, result_str);  // show result
                     dec = 0;
                     equ = 1;
@@ -402,7 +406,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdSh
     RegisterClassEx(&wc);
 
     // create main window
-    HWND hwnd = CreateWindow("CalcGUI", "Mini Calculator",
+    HWND hwnd = CreateWindow("CalcGUI", "ccal",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 400, 300, // width, height
         NULL, NULL, hInst, NULL);
