@@ -263,32 +263,55 @@ double evaluate(int argc, char* argv[], int* error) {
 #ifndef BUILDING_GUI
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        printf("Usage: %s num1 op num2 [op num3 ...] - use (), [], {} for grouping.\n", argv[0]);
+        printf("Usage:\n");
+        printf("  %s num1 op num2 [op num3 ...]         (standard mode)\n", argv[0]);
+        printf("  %s -q \"expression\"                    (quoted mode)\n", argv[0]);
         return 1;
-    }
-
-    // duplicate argv[1..argc-1] and clean commas
-    char** cleaned_args = malloc((argc - 1) * sizeof(char*));
-    if (!cleaned_args) {
-        fprintf(stderr, "Memory error\n");
-        return 1;
-    }
-
-    for (int i = 0; i < argc - 1; ++i) {
-        cleaned_args[i] = strdup(argv[i + 1]);
-        if (!cleaned_args[i]) {
-            fprintf(stderr, "Memory error\n");
-            return 1;
-        }
-        remove_commas(cleaned_args[i]);
     }
 
     int error;
-    double result = evaluate(argc - 1, cleaned_args, &error);
+    double result;
 
-    // Free memory
-    for (int i = 0; i < argc - 1; ++i) {
-        free(cleaned_args[i]);
+    // check if quoted option passed
+    if (strcmp(argv[1], "-q") == 0 || strcmp(argv[1], "--quoted") == 0) {
+        if (argc < 3) {
+            fprintf(stderr, "Error: Missing expression after -q\n");
+            return 1;
+        }
+
+        // duplicate and clean expression
+        char* expr = strdup(argv[2]);
+        if (!expr) {
+            fprintf(stderr, "Memory error\n");
+            return 1;
+        }
+        remove_commas(expr);
+        result = evaluate_expr_string(expr, &error);
+        free(expr);
+    } else {
+        // regular token-based input
+        char** cleaned_args = malloc((argc - 1) * sizeof(char*));
+        if (!cleaned_args) {
+            fprintf(stderr, "Memory error\n");
+            return 1;
+        }
+
+        for (int i = 0; i < argc - 1; ++i) {
+            cleaned_args[i] = strdup(argv[i + 1]);
+            if (!cleaned_args[i]) {
+                fprintf(stderr, "Memory error\n");
+                return 1;
+            }
+            remove_commas(cleaned_args[i]);
+        }
+
+        result = evaluate(argc - 1, cleaned_args, &error);
+
+        for (int i = 0; i < argc - 1; ++i) {
+            free(cleaned_args[i]);
+        }
+            
+        free(cleaned_args);
     }
 
     if (error) {
@@ -296,8 +319,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    printf("%.16g\n", result);  // full precision, no rounding up
+    printf("%.16g\n", result);
     return 0;
 }
 #endif
+
 

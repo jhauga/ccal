@@ -109,9 +109,13 @@ and done.
 To use as a command line tool; pass digits, arithmetic operators, and nesting characters 
 (`(`, `)`, `{`, `}`, `[`, `]`) separated with a space.
 
-**IMPORTANT NOTE** - use `x` instead of `*` for multiplcation.
+**IMPORTANT NOTE** - use `x` instead of `*` for multiplication. 
 
 ### Command Line Use Examples:
+
+To use the command line tool either input all elements of the equation separated with a space
+character, or use the quote option `-q, --quoted` which does not require elements to be separated
+with a space character.
 
 **NOTE** - if errors occur with nest characters, escape or wrap in double quotes. 
 
@@ -132,23 +136,37 @@ Perform a complex equation:
     > ccal [ [ 34 x 11 ] / [ 10 - 5 ] ] - [ 4 x 53 x [ 30 / 10 ] + [ 2 x [ 40 - 20 ] ] ] / [ 8 x 6 x [ 12 / 2 ] + 4 ]
     > -2.058904109589041
 
-will be incorrect (*correct is `72.4849`*). So instead, apply nest characters to force the correct
-order of operations:
+will be incorrect (*correct is `72.4849`*). So instead, use the quote option `-q, --quoted` (*suggested*), 
+or manually apply order of operations with nesting characters to force the correct order of operations:
 
+#### Quote Option (*suggested*):
+
+    > ccal -q "[[34x11]/[10-5]]-[4x53x[30/10]+[2x[40-20]]]/[8x6x[12/2]+4]"
+    > 72.48493150684931
+    
+#### Manually Apply Order of Operations:
+    
     > ccal [ [ 34 x 11 ] / [ 10 - 5 ] ] - [ [ [ 4 x 53 ] x [ 30 / 10 ] + [ 2 x [ 40 - 20 ] ] ] / [ 8 x 6 x [ 12 / 2 ] + 4 ] ]
     > 72.48493150684931
 
 in order to get the correct answer.
 
-**NOTE** - terminal handling of command line arugments requires numbers with commas to be wrapped
-in double quotes. So instead of:
+**NOTE** - terminal handling of command line arguments requires numbers with commas to be wrapped 
+in double quotes, but this can be bypassed using the quote option `-q, --quoted`. So instead of:
 
     > ccal 1,000 - 1
     > Error: Invalid expression
 
-use:
+use the quote option `-q, --quoted` (*suggested*), or manually wrap comma numbers:
 
-    > ccal "1,000" - 1
-    > 999
+#### Quote Option (*suggested*):
+
+    > ccal --quoted "2,000-1,000"
+    > 1000
+    
+#### Manually Wrap Comma Numbers:
+
+    > ccal "2,000" - "1,000"
+    > 1000
 
 to get the correct calculation.
