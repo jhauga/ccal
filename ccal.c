@@ -1,4 +1,4 @@
-// ccal.c
+﻿// ccal.c
 // Simple recursive descent parser for arithmetic expressions.
 // Supports numbers, + - * x / operators, unary minus, and grouping with (), [], {}.
 // Works as engine for calc_gui.c, and as a standalone command line tool.
@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include "remove_commas.h"
+#include "remove_format.h"
 
 // GLOBAL ELEMENTS:
 //////////////////////////////////////////////////////////////////////////////
@@ -26,10 +26,10 @@ double parse_term(int* error);
 double parse_factor(int* error);
 
 // GLOBAL FUNCTION - Remove commas in-place.
-void remove_commas(char* s) {
+void remove_format(char* s) {
     char* d = s;
     while (*s) {
-        if (*s != ',') *d++ = *s;
+        if (*s != ',' && *s != '$') *d++ = *s; // mind paste values - remove formatting
         s++;
     }
     *d = '\0';
@@ -285,7 +285,7 @@ int main(int argc, char* argv[]) {
             fprintf(stderr, "Memory error\n");
             return 1;
         }
-        remove_commas(expr);
+        remove_format(expr);
         result = evaluate_expr_string(expr, &error);
         free(expr);
     } else {
@@ -302,7 +302,7 @@ int main(int argc, char* argv[]) {
                 fprintf(stderr, "Memory error\n");
                 return 1;
             }
-            remove_commas(cleaned_args[i]);
+            remove_format(cleaned_args[i]);
         }
 
         result = evaluate(argc - 1, cleaned_args, &error);

@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "resource.h"
-#include "remove_commas.h"
+#include "remove_format.h"
 
 // Declare the external evaluate function implemented in calc.c
 extern double evaluate_expr_string(const char* expr, int* error);
@@ -57,7 +57,7 @@ LRESULT CALLBACK InputProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         equ = 1;
         char buffer[256];
         GetWindowText(hWnd, buffer, sizeof(buffer));
-        remove_commas(buffer);  // strip commas
+        remove_format(buffer);  // strip format
         int error;
         double result = evaluate_expr_string(buffer, &error);
         if (error)
@@ -226,7 +226,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 equ = 1;
                 char buffer[256];
                 GetWindowText(hInput, buffer, sizeof(buffer));
-                remove_commas(buffer);  // strip commas
+                remove_format(buffer);  // strip format
                 int error;
                 double result = evaluate_expr_string(buffer, &error);
                 if (error) {
@@ -361,7 +361,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 // "=" clicked: evaluate expression in input box
                 char buffer[256];
                 GetWindowText(hInput, buffer, sizeof(buffer));
-                remove_commas(buffer);  // strip commas
+                remove_format(buffer);  // strip format
                 int error;
                 double result = evaluate_expr_string(buffer, &error);
                 if (error)
