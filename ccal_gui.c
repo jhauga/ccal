@@ -57,21 +57,30 @@ LRESULT CALLBACK InputProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (msg == WM_CHAR && wParam == 13) { // enter key
         dec = 0;
         equ = 1;
+        // reset formatting state before new evaluation
+        hasDec = 0;
+        maxDec = 0;
+        offDec = 0;
+
         char buffer[256];
         GetWindowText(hWnd, buffer, sizeof(buffer));
         remove_format(buffer);  // strip format
         int error;
         double result = evaluate_expr_string(buffer, &error);
+
         if (error)
             SetWindowText(hOutput, "Error");
-        else {
+        else {            
             char result_str[64];
-            if (hasDec == 1) {
+            int maxDecLocal = 0;
+            max_decimals(&maxDecLocal);
+            FormatOutput(buffer, result, result_str);
+            /*if (hasDec == 1) {
                 snprintf(result_str, sizeof(result_str), "%.2f", result);
             }
             else {
                 snprintf(result_str, sizeof(result_str), "%.16g", result);
-            }
+            }*/
             SetWindowText(hOutput, result_str);
         }
         return 0; // handled
@@ -90,6 +99,7 @@ void FocusOnOutput() {
     SetFocus(hOutput);
     // AppendText(hInput, "", 0);
 }
+
 
 // Copy logic to get results copied to clipboard on ctrl + c.
 void copyResults() {
@@ -231,6 +241,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 // "=" clicked: evaluate expression in input box
                 dec = 0;
                 equ = 1;
+
+                // reset formatting state before new evaluation
+                hasDec = 0;
+                maxDec = 0;
+                offDec = 0;
+
                 char buffer[256];
                 GetWindowText(hInput, buffer, sizeof(buffer));
                 remove_format(buffer);  // strip format
@@ -242,12 +258,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 }
                 else {
                     char result_str[64];
-                    if (hasDec == 1) {
+                    int maxDecLocal = 0;
+                    max_decimals(&maxDecLocal);
+                    FormatOutput(buffer, result, result_str);
+                    /*if (hasDec == 1) {
                         snprintf(result_str, sizeof(result_str), "%.2f", result);
                     }
                     else {
                         snprintf(result_str, sizeof(result_str), "%.16g", result);
-                    }
+                    }*/
                     SetWindowText(hOutput, result_str);  // show result
                     FocusOnInput();
                 }
@@ -380,12 +399,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     SetWindowText(hOutput, "Error");  // show error message
                 else {
                     char result_str[64];
-                    if (hasDec == 1) {
+                    int maxDecLocal = 0;
+                    max_decimals(&maxDecLocal);
+                    FormatOutput(buffer, result, result_str);
+                   /* if (hasDec == 1) {
                         snprintf(result_str, sizeof(result_str), "%.2f", result);
                     }
                     else {
                         snprintf(result_str, sizeof(result_str), "%.16g", result);
-                    }
+                    }*/
                     SetWindowText(hOutput, result_str);  // show result
                     dec = 0;
                     equ = 1;
