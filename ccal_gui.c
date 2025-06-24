@@ -7,15 +7,15 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "resource.h"
-#include "remove_commas.h"
+#include "remove_format.h"
 
-// Declare the external evaluate function implemented in calc.c
+// Declare the external evaluate function implemented in calc.c.
 extern double evaluate_expr_string(const char* expr, int* error);
 
 // GLOBAL ELEMENTS:
 //////////////////////////////////////////////////////////////////////////////
 
-// Control IDs for window elements
+// Control IDs for window elements.
 #define ID_INPUT   1
 #define ID_OUTPUT  2
 #define ID_EQUAL   3
@@ -26,8 +26,10 @@ WNDPROC DefaultEditProc;
 #define BTN_COUNT 20
 HWND hButtons[BTN_COUNT];  // store up to 20 buttons
 
-int dec = 0; // no duplicate decimals 
-int equ = 0; // allow continue equation
+// Global variables.
+int dec = 0;    // no duplicate decimals 
+int equ = 0;    // allow continue equation
+
 
 // SUPPORT FUNCTIONS:
 //////////////////////////////////////////////////////////////////////////////
@@ -55,16 +57,30 @@ LRESULT CALLBACK InputProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (msg == WM_CHAR && wParam == 13) { // enter key
         dec = 0;
         equ = 1;
+        // reset formatting state before new evaluation
+        hasDec = 0;
+        maxDec = 0;
+        offDec = 0;
+
         char buffer[256];
         GetWindowText(hWnd, buffer, sizeof(buffer));
-        remove_commas(buffer);  // strip commas
+        remove_format(buffer);  // strip format
         int error;
         double result = evaluate_expr_string(buffer, &error);
+
         if (error)
             SetWindowText(hOutput, "Error");
-        else {
+        else {            
             char result_str[64];
-            snprintf(result_str, sizeof(result_str), "%.16g", result);
+            int maxDecLocal = 0;
+            max_decimals(&maxDecLocal);
+            FormatOutput(buffer, result, result_str);
+            /*if (hasDec == 1) {
+                snprintf(result_str, sizeof(result_str), "%.2f", result);
+            }
+            else {
+                snprintf(result_str, sizeof(result_str), "%.16g", result);
+            }*/
             SetWindowText(hOutput, result_str);
         }
         return 0; // handled
@@ -83,6 +99,7 @@ void FocusOnOutput() {
     SetFocus(hOutput);
     // AppendText(hInput, "", 0);
 }
+
 
 // Copy logic to get results copied to clipboard on ctrl + c.
 void copyResults() {
@@ -224,9 +241,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 // "=" clicked: evaluate expression in input box
                 dec = 0;
                 equ = 1;
+
+                // reset formatting state before new evaluation
+                hasDec = 0;
+                maxDec = 0;
+                offDec = 0;
+
                 char buffer[256];
                 GetWindowText(hInput, buffer, sizeof(buffer));
-                remove_commas(buffer);  // strip commas
+                remove_format(buffer);  // strip format
                 int error;
                 double result = evaluate_expr_string(buffer, &error);
                 if (error) {
@@ -235,7 +258,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 }
                 else {
                     char result_str[64];
-                    snprintf(result_str, sizeof(result_str), "%.16g", result);
+                    int maxDecLocal = 0;
+                    max_decimals(&maxDecLocal);
+                    FormatOutput(buffer, result, result_str);
+                    /*if (hasDec == 1) {
+                        snprintf(result_str, sizeof(result_str), "%.2f", result);
+                    }
+                    else {
+                        snprintf(result_str, sizeof(result_str), "%.16g", result);
+                    }*/
                     SetWindowText(hOutput, result_str);  // show result
                     FocusOnInput();
                 }
@@ -361,14 +392,22 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 // "=" clicked: evaluate expression in input box
                 char buffer[256];
                 GetWindowText(hInput, buffer, sizeof(buffer));
-                remove_commas(buffer);  // strip commas
+                remove_format(buffer);  // strip format
                 int error;
                 double result = evaluate_expr_string(buffer, &error);
                 if (error)
                     SetWindowText(hOutput, "Error");  // show error message
                 else {
                     char result_str[64];
-                    snprintf(result_str, sizeof(result_str), "%.16g", result);
+                    int maxDecLocal = 0;
+                    max_decimals(&maxDecLocal);
+                    FormatOutput(buffer, result, result_str);
+                   /* if (hasDec == 1) {
+                        snprintf(result_str, sizeof(result_str), "%.2f", result);
+                    }
+                    else {
+                        snprintf(result_str, sizeof(result_str), "%.16g", result);
+                    }*/
                     SetWindowText(hOutput, result_str);  // show result
                     dec = 0;
                     equ = 1;
