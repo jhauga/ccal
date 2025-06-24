@@ -9,13 +9,13 @@
 #include "resource.h"
 #include "remove_format.h"
 
-// Declare the external evaluate function implemented in calc.c
+// Declare the external evaluate function implemented in calc.c.
 extern double evaluate_expr_string(const char* expr, int* error);
 
 // GLOBAL ELEMENTS:
 //////////////////////////////////////////////////////////////////////////////
 
-// Control IDs for window elements
+// Control IDs for window elements.
 #define ID_INPUT   1
 #define ID_OUTPUT  2
 #define ID_EQUAL   3
@@ -26,8 +26,10 @@ WNDPROC DefaultEditProc;
 #define BTN_COUNT 20
 HWND hButtons[BTN_COUNT];  // store up to 20 buttons
 
-int dec = 0; // no duplicate decimals 
-int equ = 0; // allow continue equation
+// Global variables.
+int dec = 0;    // no duplicate decimals 
+int equ = 0;    // allow continue equation
+
 
 // SUPPORT FUNCTIONS:
 //////////////////////////////////////////////////////////////////////////////
@@ -64,7 +66,12 @@ LRESULT CALLBACK InputProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             SetWindowText(hOutput, "Error");
         else {
             char result_str[64];
-            snprintf(result_str, sizeof(result_str), "%.16g", result);
+            if (hasDec == 1) {
+                snprintf(result_str, sizeof(result_str), "%.2f", result);
+            }
+            else {
+                snprintf(result_str, sizeof(result_str), "%.16g", result);
+            }
             SetWindowText(hOutput, result_str);
         }
         return 0; // handled
@@ -235,7 +242,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 }
                 else {
                     char result_str[64];
-                    snprintf(result_str, sizeof(result_str), "%.16g", result);
+                    if (hasDec == 1) {
+                        snprintf(result_str, sizeof(result_str), "%.2f", result);
+                    }
+                    else {
+                        snprintf(result_str, sizeof(result_str), "%.16g", result);
+                    }
                     SetWindowText(hOutput, result_str);  // show result
                     FocusOnInput();
                 }
@@ -368,7 +380,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     SetWindowText(hOutput, "Error");  // show error message
                 else {
                     char result_str[64];
-                    snprintf(result_str, sizeof(result_str), "%.16g", result);
+                    if (hasDec == 1) {
+                        snprintf(result_str, sizeof(result_str), "%.2f", result);
+                    }
+                    else {
+                        snprintf(result_str, sizeof(result_str), "%.16g", result);
+                    }
                     SetWindowText(hOutput, result_str);  // show result
                     dec = 0;
                     equ = 1;

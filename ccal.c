@@ -12,6 +12,9 @@
 // GLOBAL ELEMENTS:
 //////////////////////////////////////////////////////////////////////////////
 
+// Global variables.
+int hasDec = 0; // don't round if no decimal
+
 // Global pointer to current position in expression string
 static const char* expr_ptr;
 
@@ -30,6 +33,7 @@ void remove_format(char* s) {
     char* d = s;
     while (*s) {
         if (*s != ',' && *s != '$') *d++ = *s; // mind paste values - remove formatting
+        if (*s == '.') hasDec = 1;
         s++;
     }
     *d = '\0';
@@ -318,8 +322,12 @@ int main(int argc, char* argv[]) {
         printf("Error: Invalid expression\n");
         return 1;
     }
-
-    printf("%.16g\n", result);
+    if (hasDec == 1) {
+        printf("%.2f\n", result);
+    }
+    else {
+        printf("%.16g\n", result);
+    }
     return 0;
 }
 #endif
