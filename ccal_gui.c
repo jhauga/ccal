@@ -74,13 +74,8 @@ LRESULT CALLBACK InputProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             char result_str[64];
             int maxDecLocal = 0;
             max_decimals(&maxDecLocal);
+            // ready output rendering
             FormatOutput(buffer, result, result_str);
-            /*if (hasDec == 1) {
-                snprintf(result_str, sizeof(result_str), "%.2f", result);
-            }
-            else {
-                snprintf(result_str, sizeof(result_str), "%.16g", result);
-            }*/
             SetWindowText(hOutput, result_str);
         }
         return 0; // handled
@@ -260,13 +255,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     char result_str[64];
                     int maxDecLocal = 0;
                     max_decimals(&maxDecLocal);
-                    FormatOutput(buffer, result, result_str);
-                    /*if (hasDec == 1) {
-                        snprintf(result_str, sizeof(result_str), "%.2f", result);
-                    }
-                    else {
-                        snprintf(result_str, sizeof(result_str), "%.16g", result);
-                    }*/
+                    // ready output rendering
+                    FormatOutput(buffer, result, result_str);                   
                     SetWindowText(hOutput, result_str);  // show result
                     FocusOnInput();
                 }
@@ -401,13 +391,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     char result_str[64];
                     int maxDecLocal = 0;
                     max_decimals(&maxDecLocal);
+                    // ready output rendering
                     FormatOutput(buffer, result, result_str);
-                   /* if (hasDec == 1) {
-                        snprintf(result_str, sizeof(result_str), "%.2f", result);
-                    }
-                    else {
-                        snprintf(result_str, sizeof(result_str), "%.16g", result);
-                    }*/
                     SetWindowText(hOutput, result_str);  // show result
                     dec = 0;
                     equ = 1;
