@@ -30,7 +30,6 @@ HWND hButtons[BTN_COUNT];  // store up to 20 buttons
 int dec = 0;    // no duplicate decimals 
 int equ = 0;    // allow continue equation
 
-
 // SUPPORT FUNCTIONS:
 //////////////////////////////////////////////////////////////////////////////
 
@@ -53,36 +52,6 @@ void AddButton(HWND parent, const char* label, int x, int y, int id) {
         parent, (HMENU)(intptr_t)id, NULL, NULL);
 }
 
-LRESULT CALLBACK InputProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    if (msg == WM_CHAR && wParam == 13) { // enter key
-        dec = 0;
-        equ = 1;
-        // reset formatting state before new evaluation
-        hasDec = 0;
-        maxDec = 0;
-        offDec = 0;
-
-        char buffer[256];
-        GetWindowText(hWnd, buffer, sizeof(buffer));
-        remove_format(buffer);  // strip format
-        int error;
-        double result = evaluate_expr_string(buffer, &error);
-
-        if (error)
-            SetWindowText(hOutput, "Error");
-        else {            
-            char result_str[64];
-            int maxDecLocal = 0;
-            max_decimals(&maxDecLocal);
-            // ready output rendering
-            FormatOutput(buffer, result, result_str);
-            SetWindowText(hOutput, result_str);
-        }
-        return 0; // handled
-    }
-    return CallWindowProc(DefaultEditProc, hWnd, msg, wParam, lParam);
-}
-
 // Set focus on input area to always allow keyboard use.
 void FocusOnInput() {
     SetFocus(hInput);
@@ -94,7 +63,6 @@ void FocusOnOutput() {
     SetFocus(hOutput);
     // AppendText(hInput, "", 0);
 }
-
 
 // Copy logic to get results copied to clipboard on ctrl + c.
 void copyResults() {
@@ -116,6 +84,15 @@ void copyResults() {
     }    
 }
 
+// Clear input on c button or keyboard c.
+void clearInput() {
+    dec = 0;
+    equ = 0;
+    SetWindowText(hInput, "");
+    SetWindowText(hOutput, "");
+    FocusOnInput();
+}
+
 // Set decimal switch variables to handle calculation and round accordingly.
 void baseDecimal() { 
     dec = 0;
@@ -125,6 +102,43 @@ void baseDecimal() {
     hasDec = 0;
     maxDec = 0;
     offDec = 0;
+}
+
+// Handle initial input and keypress.
+LRESULT CALLBACK InputProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (!(GetKeyState(VK_CONTROL) & 0x8000) && (wParam == 'd' || wParam == 'D')) {
+        // 'd' or 'D' is pressed: clear input
+        clearInput();  // clear equation and calculation
+        return 0;
+    }
+    else if (msg == WM_CHAR && wParam == 13) { // enter key
+        dec = 0;
+        equ = 1;
+        // reset formatting state before new evaluation
+        hasDec = 0;
+        maxDec = 0;
+        offDec = 0;
+
+        char buffer[256];
+        GetWindowText(hWnd, buffer, sizeof(buffer));
+        remove_format(buffer);  // strip format
+        int error;
+        double result = evaluate_expr_string(buffer, &error);
+
+        if (error) {
+            SetWindowText(hOutput, "Error");
+        }
+        else {
+            char result_str[64];
+            int maxDecLocal = 0;
+            max_decimals(&maxDecLocal);
+            // ready output rendering
+            FormatOutput(buffer, result, result_str);
+            SetWindowText(hOutput, result_str);
+        }
+        return 0; // handled
+    }
+    return CallWindowProc(DefaultEditProc, hWnd, msg, wParam, lParam);
 }
 
 // Main window procedure to handle events
@@ -268,12 +282,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 }
             }
             else if (LOWORD(wParam) == 20) {
-                // "c" is clicked: clear input
-                dec = 0;
-                equ = 0;
-                SetWindowText(hInput, "");
-                SetWindowText(hOutput, "");
-                FocusOnInput();
+                // "c" btn is clicked: clear input
+                clearInput();
             }
             else if (LOWORD(wParam) == 21) {
                 // "." add decimal ascii decimal value
@@ -317,6 +327,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 copyResults();
                 return 0;
             }
+            else {
+                // focus on input when window is active
+                FocusOnInput();
+            }
             break;
         }
         // ensure ctrl + c gets equated results
@@ -354,6 +368,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             } else if (LOWORD(wParam) == WA_INACTIVE) {
                 // Window is not active — unregister hotkey
                 UnregisterHotKey(hwnd, 1);
+            }
+            else {
+                // focus on input when window is active
+                FocusOnInput();
             }
             break;
         }
@@ -409,6 +427,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     dec = 0;
                     equ = 1;
                 }
+            }
+            else {
+                // focus on input when window is active
+                FocusOnInput();
             }
             return 0;  // indicate message processed
         }
