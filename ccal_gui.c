@@ -116,6 +116,17 @@ void copyResults() {
     }    
 }
 
+// Set decimal switch variables to handle calculation and round accordingly.
+void baseDecimal() { 
+    dec = 0;
+    equ = 1;
+
+    // reset formatting state before new evaluation
+    hasDec = 0;
+    maxDec = 0;
+    offDec = 0;
+}
+
 // Main window procedure to handle events
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
@@ -234,13 +245,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             else if (LOWORD(wParam) == ID_EQUAL) {
                 // "=" clicked: evaluate expression in input box
-                dec = 0;
-                equ = 1;
-
-                // reset formatting state before new evaluation
-                hasDec = 0;
-                maxDec = 0;
-                offDec = 0;
+                baseDecimal();
 
                 char buffer[256];
                 GetWindowText(hInput, buffer, sizeof(buffer));
@@ -253,10 +258,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 }
                 else {
                     char result_str[64];
+                    // round accordingly process
                     int maxDecLocal = 0;
                     max_decimals(&maxDecLocal);
                     // ready output rendering
-                    FormatOutput(buffer, result, result_str);                   
+                    FormatOutput(buffer, result, result_str);
                     SetWindowText(hOutput, result_str);  // show result
                     FocusOnInput();
                 }
@@ -280,16 +286,22 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             else if (LOWORD(wParam) == 34) {
                 // negate current value;
+                baseDecimal(); // ready for rounding decimal accordingly
                 char val[255];
                 GetWindowText(hOutput, val, sizeof(val));
-
+                remove_format(val);  // strip format
+                
                 char* end;
                 double result = strtod(val, &end);
 
                 if (val[0] != '\0' && *end == '\0') {
                     result = -result;
                     char neg_str[64];
-                    snprintf(neg_str, sizeof(neg_str), "%.6g", result);
+                    // round accordingly process
+                    int maxDecLocal = 0;
+                    max_decimals(&maxDecLocal);
+                    // ready output rendering
+                    FormatOutput(val, result, neg_str);                    
                     SetWindowText(hOutput, neg_str);
                     SetWindowText(hInput, neg_str);  // optional: push it back to input too
                     FocusOnInput();
