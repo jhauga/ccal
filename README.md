@@ -5,6 +5,7 @@ Simple GUI (*Windows OS only*) and command line calculator, allowing for long ma
 ## Requirements:
 
 For Apple, Linux, and Windows the GNU compile tool `gcc` is required.
+
 **NOTE** - for Windows `cygwin` will be used to install gcc.
 
 ### Apple:
@@ -221,5 +222,5 @@ option, both the `p` and `^` character can be used as the operator.
 
 #### Quote Option (*suggested*):
 
-    > ccal --quote "2^"
+    > ccal --quote "2^2"
     > 4
