@@ -1,8 +1,6 @@
 # ccal![repo icon](assets/icon.png)
 
-Simple GUI (*Windows OS only*) and command line calculator, allowing for arithmetic equations.
-This project was mainly utilized to learn `C`, but turned out to be pretty useful as it allows 
-for long mathematical expressions.
+Simple GUI (*Windows OS only*) and command line calculator, allowing for long mathematical expressions.
 
 ## Requirements:
 
@@ -30,6 +28,12 @@ sudo apt update
 sudo apt install build-essential
 ```
 
+To write changes to `help.txt`, you'll need `xxd`.
+
+```
+sudo apt install xxd
+```
+
 ### Windows:
 
 First use Windows package manager `winget` to install `cygwin`.
@@ -46,10 +50,16 @@ and install gcc using:
 setup-x86_64.exe -P gcc-core
 ```
 
+To write changes to `help.txt`, you'll need `xxd`.
+
+```
+setup-x86_64.exe -P xxd
+```
+
 then follow the prompts until you reach the "Select Packages" window of the GUI installer. 
 
-**NOTE** - if you do not see the `gcc-core` package in the results, perform a search for `gcc-core`,
-then select it, click next, and finish the install process.
+**NOTE** - if you do not see the `gcc-core` package in the results, perform a search 
+for `gcc-core`, then select it, click next, and finish the install process.
 
 ## Compile Command Line Tool:
 
@@ -62,6 +72,14 @@ gcc ccal.c -o ccal.exe
 ```
 
 and done.
+
+**NOTE** - to include changes to `help.txt`, run:
+
+```
+xxd -i help.txt > help.h
+```
+
+before compiling.
 
 ## Compile GUI:
 
@@ -104,17 +122,39 @@ gcc -DBUILDING_GUI ccal_gui.c ccal.c ccal_gui.res -o ccal_gui.exe -mwindows
 
 and done.
 
+## GUI Usage:
+
+**NOTE** - Windows only.
+
+To use the GUI version of the application, double click or call the compiled
+file. Once the window opens, click the buttons or use the keyboard to input
+the mathematical expression. Press `Enter` or click `=` to calculate the
+expression. Press `d` to clear the contents of the expression and calculation.
+Use `ctrl + c` to copy the calculation to the clipboard.
+
 ## Command Line Usage:
 
 To use as a command line tool; pass digits, arithmetic operators, and nesting characters 
 (`(`, `)`, `{`, `}`, `[`, `]`) separated with a space.
 
-**IMPORTANT NOTE** - use `x` instead of `*` for multiplication. 
+**IMPORTANT NOTE** - use `x` instead of `*` for multiplication when `-q, --quote` is not used. 
+
+**IMPORTANT NOTE** - use `p` instead of `^` for exponentiation when `-q, --quote` is not used. 
+
+###  Acceptable Arithmetic Operators:
+
+    +  ->  addition
+    -  ->  subtraction
+    /  ->  division
+    x  ->  multiplication
+    *  ->  multiplication (NOTE - use -q, --quote to use)
+    p  ->  exponentiation (power of)
+    ^  ->  exponentiation (NOTE - use -q, --quote to use) 
 
 ### Command Line Use Examples:
 
 To use the command line tool either input all elements of the equation separated with a space
-character, or use the quote option `-q, --quoted` which does not require elements to be separated
+character, or use the quote option `-q, --quote` which does not require elements to be separated
 with a space character.
 
 **NOTE** - if errors occur with nest characters, escape or wrap in double quotes. 
@@ -136,7 +176,7 @@ Perform a complex equation:
     > ccal [ [ 34 x 11 ] / [ 10 - 5 ] ] - [ 4 x 53 x [ 30 / 10 ] + [ 2 x [ 40 - 20 ] ] ] / [ 8 x 6 x [ 12 / 2 ] + 4 ]
     > -2.058904109589041
 
-will be incorrect (*correct is `72.4849`*). So instead, use the quote option `-q, --quoted` (*suggested*), 
+will be incorrect (*correct is `72.4849`*). So instead, use the quote option `-q, --quote` (*suggested*), 
 or manually apply order of operations with nesting characters to force the correct order of operations:
 
 #### Quote Option (*suggested*):
@@ -152,16 +192,16 @@ or manually apply order of operations with nesting characters to force the corre
 in order to get the correct answer.
 
 **NOTE** - terminal handling of command line arguments requires numbers with commas to be wrapped 
-in double quotes, but this can be bypassed using the quote option `-q, --quoted`. So instead of:
+in double quotes, but this can be bypassed using the quote option `-q, --quote`. So instead of:
 
     > ccal 1,000 - 1
     > Error: Invalid expression
 
-use the quote option `-q, --quoted` (*suggested*), or manually wrap comma numbers:
+use the quote option `-q, --quote` (*suggested*), or manually wrap comma numbers:
 
 #### Quote Option (*suggested*):
 
-    > ccal --quoted "2,000-1,000"
+    > ccal --quote "2,000-1,000"
     > 1000
     
 #### Manually Wrap Comma Numbers:
@@ -170,3 +210,16 @@ use the quote option `-q, --quoted` (*suggested*), or manually wrap comma number
     > 1000
 
 to get the correct calculation.
+
+#### Calculate Exponentiation:
+
+To calculate the exponentiation (*power of*) use `p` as the operator. If using the `-q, --quote`
+option, both the `p` and `^` character can be used as the operator.
+
+    > ccal 2 p 2
+    > 4
+
+#### Quote Option (*suggested*):
+
+    > ccal --quote "2^"
+    > 4

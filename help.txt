@@ -1,0 +1,33 @@
+ ccal
+
+ Simple command line calculator, allowing for long mathematical expressions.
+
+ Usage: ccal [-h, --help] [-q, --quote <expression>] | <expression>
+
+ Option List:
+
+ Option            Description
+  -h, --help        Output the contents of the help (this) document.
+  -q, --quote       Use quotes for the mathematical expression.
+  expression        The mathematical expression to calculate.
+                    IMPORTANT - when used without -q, --quote a space
+                                character must be between each input.
+                                
+ Acceptable Arithmetic Operators:
+  +  ->  addition
+  -  ->  subtraction
+  /  ->  division
+  x  ->  multiplication
+  *  ->  multiplication (NOTE - use -q, --quote to use)
+  p  ->  exponentiation (power of)
+  ^  ->  exponentiation (NOTE - use -q, --quote to use) 
+
+ Use Example:
+  > ccal 1 + 1
+    - Calculate a mathematical expression.
+  > ccal --quote "1+1"
+    - Calculate a mathematical expression using quotes.
+  > ccal 2 p 2
+    - Calculate the exponentiation of a mathematical expression.
+  > ccal -q "2^2"
+    - Calculate the exponentiation of a mathematical expression using quotes.

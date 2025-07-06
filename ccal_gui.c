@@ -207,15 +207,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 }
             }
 
-            // Create operator buttons
-            AddButton(hwnd, "+", 240, 80, 30);
-            AddButton(hwnd, "-", 285, 80, 31);
-            AddButton(hwnd, "x", 240, 120, 32);
-            AddButton(hwnd, "/", 285, 120, 33);
-            AddButton(hwnd, "+/-", 330, 120, 34);
-
-            // Create "=" button to evaluate expression
-            AddButton(hwnd, "=", 330, 80, ID_EQUAL);
+            // create operator buttons
+            AddButton(hwnd, "+", 190, 80, 30);
+            AddButton(hwnd, "-", 230, 80, 31);
+            AddButton(hwnd, "x", 190, 120, 32);
+            AddButton(hwnd, "/", 230, 120, 33);
+            AddButton(hwnd, "^", 230, 160, 34);
+            
+            // create "=" and "+/-" button to evaluate and negate evaluation
+            AddButton(hwnd, "+/-", 190, 160, 35);
+            AddButton(hwnd, "=",   190, 200, ID_EQUAL);
 
             DefaultEditProc = (WNDPROC)SetWindowLongPtr(hInput, GWLP_WNDPROC, (LONG_PTR)InputProc);
 
@@ -235,10 +236,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 AppendText(hInput, c, 0);
                 FocusOnInput();
             }
-            else if (LOWORD(wParam) >= 30 && LOWORD(wParam) <= 33) {
-                // operator buttons clicked: append operator + space
+            else if (LOWORD(wParam) >= 30 && LOWORD(wParam) <= 34) {
+                // operator buttons clicked: append operator
                 dec = 0;
-                const char* ops[] = { "+ ", "- ", "x ", "/ " };
+                const char* ops[] = { "+", "-", "x", "/", "^"};
                 char val[255];
                 GetWindowText(hOutput, val, sizeof(val));
                 if (val[0] == '\0' || strcmp(val, "Error") == 0) {
@@ -294,7 +295,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     FocusOnInput();
                 }
             }
-            else if (LOWORD(wParam) == 34) {
+            else if (LOWORD(wParam) == 35) {
                 // negate current value;
                 baseDecimal(); // ready for rounding decimal accordingly
                 char val[255];
@@ -385,8 +386,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 AppendText(hInput, text, 0);
                 FocusOnInput();
             }
-            else if (c == '+' || c == '-' || c == '/' || c == 'x' ||
-                c == '*' || c == '(' || c == '[' || c == '{') {
+            else if (c == '+' || c == '-' || c == '/' || 
+                     c == '^' || c == 'p' || c == 'P' ||
+                     c == 'x' || c == 'X' || c == '*' || 
+                     c == '(' || c == '[' || c == '{') {
                 // append operator or opening bracket plus a trailing space
                 dec = 0;
                 char text[3] = { c, ' ', 0 };
@@ -465,9 +468,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdSh
 
     // create main window
     HWND hwnd = CreateWindow("CalcGUI", "ccal",
-        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-        CW_USEDEFAULT, CW_USEDEFAULT, 400, 300, // width, height
-        NULL, NULL, hInst, NULL);
+                WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+                CW_USEDEFAULT, CW_USEDEFAULT, 400, 300, // width, height
+                NULL, NULL, hInst, NULL);
     
     if (!hwnd) return 1;
 

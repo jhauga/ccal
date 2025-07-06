@@ -8,6 +8,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "remove_format.h"
+#include "help.h"
 
 // GLOBAL ELEMENTS:
 //////////////////////////////////////////////////////////////////////////////
@@ -49,9 +50,9 @@ void max_decimals(int* num) {
     const char* start = expr_ptr;
     char* end;
 
-    strtod(expr_ptr, &end); // We still parse the number to move expr_ptr.
+    strtod(expr_ptr, &end); // parse the number to move expr_ptr.
 
-    if (end == start) return; // Not a number
+    if (end == start) return; // not a number
 
     const char* dot = strchr(start, '.');
     if (offDec == 1) {
@@ -68,7 +69,7 @@ void max_decimals(int* num) {
                 p++;
             }
 
-            // Trim trailing zeros if count > 2
+            // trim trailing zeros
             if (count > 2) {
                 const char* t = end - 1;
                 while (count > 2 && *t == '0') {
@@ -106,12 +107,27 @@ void FormatOutput(const char* expr, double result, char* fin_str) {
     }
 }
 
+// Calculate power of call.
+double power_of(double base, double expo) {
+    double mathOut = base;
+    for (int j = 1; j < expo; j++) {
+        base = mathOut * base;
+    }
+    return base;
+}
+
 /*****************************************************************************
 *  GUI APPLICATION USEAGE:                                                   *
 *****************************************************************************/
 
 // GUI APPLICATION - SUPPORT FUNCTIONS:
 //////////////////////////////////////////////////////////////////////////////
+
+// Shift elements in parse_term function for handling gui and -q, --quote.
+double shift_parse(int* error) {
+    expr_ptr++;
+    return parse_factor(error);
+}
 
 // Parse a number from the expression.
 double parse_number(int* error) {
@@ -126,7 +142,7 @@ double parse_number(int* error) {
         return 0;
     }
 
-    // Count number of decimal places
+    // count number of decimal places
     const char* dot = strchr(start, '.');
     if (dot && dot < end) {
         hasDec = 1;
@@ -138,7 +154,7 @@ double parse_number(int* error) {
             p++;
         }
 
-        // Check trailing zeros
+        // check trailing zeros
         const char* t = end - 1;
         while (count > 2 && *t == '0') {
             count--;
@@ -190,19 +206,21 @@ double parse_term(int* error) {
     double left = parse_factor(error);
     while (1) {
         skip_spaces();
-        if (*expr_ptr == 'x' || *expr_ptr == '*') {
-            expr_ptr++;
-            double right = parse_factor(error);
+        if (*expr_ptr == 'x' || *expr_ptr == 'X' || *expr_ptr == '*') {
+            double right = shift_parse(error);
             left *= right;
         }
         else if (*expr_ptr == '/') {
-            expr_ptr++;
-            double right = parse_factor(error);
+            double right = shift_parse(error);
             if (right == 0) {
                 *error = 1;  // division by zero error
                 return 0;
             }
             left /= right;
+        }
+        else if (*expr_ptr == 'p' || *expr_ptr == 'P' || *expr_ptr == '^') {
+            double right = shift_parse(error);
+            left = power_of(left, right);
         }
         else {
             break;
@@ -227,7 +245,9 @@ double parse_expr(int* error) {
             left -= right;
         }
         else {
-            if (*expr_ptr == '*' || *expr_ptr == 'x' || *expr_ptr == '/') {
+            if (*expr_ptr == '*' || *expr_ptr == 'x' || *expr_ptr == 'X' ||
+                *expr_ptr == '/' || *expr_ptr == 'p' || *expr_ptr == 'P' ||
+                *expr_ptr == '^') {
                 hasDec = 0;
                 maxDec = 0;
                 offDec = 1;
@@ -266,7 +286,9 @@ double evaluate_expr_string(const char* expr, int* error) {
 // Check if parameter passed is operator.
 int is_operator(const char* s) {
     return (strcmp(s, "+") == 0 || strcmp(s, "-") == 0 ||
-        strcmp(s, "x") == 0 || strcmp(s, "/") == 0);
+            strcmp(s, "x") == 0 || strcmp(s, "X") == 0 ||
+            strcmp(s, "p") == 0 || strcmp(s, "P") == 0 ||
+            strcmp(s, "/") == 0);
 }
 
 // Handle opening nest characters.
@@ -282,8 +304,8 @@ int is_close_paren(const char* s) {
 // Ensure nest characters match.
 int paren_match(const char* open, const char* close) {
     return (strcmp(open, "(") == 0 && strcmp(close, ")") == 0) ||
-        (strcmp(open, "[") == 0 && strcmp(close, "]") == 0) ||
-        (strcmp(open, "{") == 0 && strcmp(close, "}") == 0);
+           (strcmp(open, "[") == 0 && strcmp(close, "]") == 0) ||
+           (strcmp(open, "{") == 0 && strcmp(close, "}") == 0);
 }
 
 // Forward declaration.
@@ -301,7 +323,8 @@ double parse_term_eval(int* i, char* argv[], int argc, int* error) {
         const char* open = tok;
         (*i)++;
         double val = parse_expr_eval(i, argv, argc, error);
-        if (*error || *i >= argc || !is_close_paren(argv[*i]) || !paren_match(open, argv[*i])) {
+        if (*error || *i >= argc      || 
+            !is_close_paren(argv[*i]) || !paren_match(open, argv[*i])) {
             *error = 1;
             return 0;
         }
@@ -326,21 +349,33 @@ double parse_expr_eval(int* i, char* argv[], int argc, int* error) {
 
         if (*error) return 0;
 
-        if (strcmp(op, "*") == 0 || strcmp(op, "x") == 0 || strcmp(op, "/") == 0) {
+        if (strcmp(op, "*") == 0 || strcmp(op, "x") == 0 || strcmp(op, "X") == 0 ||
+            strcmp(op, "/") == 0 || strcmp(op, "p") == 0 || strcmp(op, "P") == 0) {
+            // set for decimal count
             hasDec = 0;
             maxDec = 0;
             offDec = 1;
         }
-
+        /* addition */
         if (strcmp(op, "+") == 0) result += rhs;
+
+        /* subtraction */
         else if (strcmp(op, "-") == 0) result -= rhs;
-        else if (strcmp(op, "x") == 0) result *= rhs;        
+
+        /* multiplication */
+        else if (strcmp(op, "x") == 0 || strcmp(op, "X") == 0 ||
+                 strcmp(op, "*") == 0) result *= rhs;
+
+        /* division */
         else if (strcmp(op, "/") == 0) {
             if (rhs == 0) {
                 *error = 1;
                 return 0;
             }
             result /= rhs;
+        }
+        else if (strcmp(op, "p") == 0 || strcmp(op, "P") == 0) {
+            result = power_of(result, rhs);
         }
     }
     return result;
@@ -371,18 +406,20 @@ double evaluate(int argc, char* argv[], int* error) {
 // gcc -DBUILDING_GUI ccal.c ccal_gui.c -o ccal_gui.exe -mwindows
 #ifndef BUILDING_GUI
 int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        printf("Usage:\n");
-        printf("  %s num1 op num2 [op num3 ...]         (standard mode)\n", argv[0]);
-        printf("  %s -q \"expression\"                    (quoted mode)\n", argv[0]);
-        return 1;
+    if (argc == 1 ||
+       (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0))
+       ) 
+    {
+        // output help document
+        fwrite(help_txt, 1, help_txt_len, stdout);
+        return 0;
     }
 
     int error;
     double result;
 
     // check if quoted option passed
-    if (strcmp(argv[1], "-q") == 0 || strcmp(argv[1], "--quoted") == 0) {
+    if (strcmp(argv[1], "-q") == 0 || strcmp(argv[1], "--quote") == 0) {
         if (argc < 3) {
             fprintf(stderr, "Error: Missing expression after -q\n");
             return 1;
