@@ -108,7 +108,7 @@ void FormatOutput(const char* expr, double result, char* fin_str) {
 }
 
 // Calculate power of call.
-double power_of(double base, double expo) {
+double power_of(double base, int expo) {
     double mathOut = base;
     for (int j = 1; j < expo; j++) {
         base = mathOut * base;

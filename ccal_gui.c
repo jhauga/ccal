@@ -106,37 +106,37 @@ void baseDecimal() {
 
 // Handle initial input and keypress.
 LRESULT CALLBACK InputProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    if (!(GetKeyState(VK_CONTROL) & 0x8000) && (wParam == 'd' || wParam == 'D')) {
-        // 'd' or 'D' is pressed: clear input
-        clearInput();  // clear equation and calculation
-        return 0;
-    }
-    else if (msg == WM_CHAR && wParam == 13) { // enter key
-        dec = 0;
-        equ = 1;
-        // reset formatting state before new evaluation
-        hasDec = 0;
-        maxDec = 0;
-        offDec = 0;
+    if (msg == WM_CHAR) {
+        char c = (char)wParam;
 
-        char buffer[256];
-        GetWindowText(hWnd, buffer, sizeof(buffer));
-        remove_format(buffer);  // strip format
-        int error;
-        double result = evaluate_expr_string(buffer, &error);
+        if (!(GetKeyState(VK_CONTROL) & 0x8000) && (c == 'd' || c == 'D')) {
+            // 'd' or 'D' is pressed: clear input
+            clearInput();  // clear equation and calculation
+            return 0;
+        }
+        else if (msg == WM_CHAR && wParam == 13) { // enter key
+            // reset formatting state before new evaluation
+            baseDecimal();
 
-        if (error) {
-            SetWindowText(hOutput, "Error");
+            char buffer[256];
+            GetWindowText(hWnd, buffer, sizeof(buffer));
+            remove_format(buffer);  // strip format
+            int error;
+            double result = evaluate_expr_string(buffer, &error);
+
+            if (error) {
+                SetWindowText(hOutput, "Error");
+            }
+            else {
+                char result_str[64];
+                int maxDecLocal = 0;
+                max_decimals(&maxDecLocal);
+                // ready output rendering
+                FormatOutput(buffer, result, result_str);
+                SetWindowText(hOutput, result_str);
+            }
+            return 0; // handled
         }
-        else {
-            char result_str[64];
-            int maxDecLocal = 0;
-            max_decimals(&maxDecLocal);
-            // ready output rendering
-            FormatOutput(buffer, result, result_str);
-            SetWindowText(hOutput, result_str);
-        }
-        return 0; // handled
     }
     return CallWindowProc(DefaultEditProc, hWnd, msg, wParam, lParam);
 }
