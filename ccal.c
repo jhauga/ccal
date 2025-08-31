@@ -220,7 +220,11 @@ double parse_term(int* error) {
         }
         else if (*expr_ptr == 'p' || *expr_ptr == 'P' || *expr_ptr == '^') {
             double right = shift_parse(error);
-            left = power_of(left, right);
+            // power_of does not set to 1 or -1 when exponent is 0
+            if (left < 0)
+                left = right == 0 ? -1 : power_of(left, right);
+            else
+                left = right == 0 ? 1 : power_of(left, right);
         }
         else {
             break;
@@ -261,7 +265,7 @@ double parse_expr(int* error) {
 // GUI APPLICATION - MAIN FUNCTION:
 //////////////////////////////////////////////////////////////////////////////
 
-// Evaluates an expression string and returns result. If error occurs, 
+// Evaluates an expression string and returns result. If error occurs,
 // *error is set to 1.
 double evaluate_expr_string(const char* expr, int* error) {
     *error = 0;
@@ -323,7 +327,7 @@ double parse_term_eval(int* i, char* argv[], int argc, int* error) {
         const char* open = tok;
         (*i)++;
         double val = parse_expr_eval(i, argv, argc, error);
-        if (*error || *i >= argc      || 
+        if (*error || *i >= argc      ||
             !is_close_paren(argv[*i]) || !paren_match(open, argv[*i])) {
             *error = 1;
             return 0;
@@ -375,7 +379,10 @@ double parse_expr_eval(int* i, char* argv[], int argc, int* error) {
             result /= rhs;
         }
         else if (strcmp(op, "p") == 0 || strcmp(op, "P") == 0) {
-            result = power_of(result, rhs);
+            if (result < 0)
+                result = rhs == 0 ? -1 : power_of(result, rhs);
+            else
+                result = rhs == 0 ? 1 : power_of(result, rhs);
         }
     }
     return result;
@@ -408,7 +415,7 @@ double evaluate(int argc, char* argv[], int* error) {
 int main(int argc, char* argv[]) {
     if (argc == 1 ||
        (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0))
-       ) 
+       )
     {
         // output help document
         fwrite(help_txt, 1, help_txt_len, stdout);
@@ -451,12 +458,12 @@ int main(int argc, char* argv[]) {
             remove_format(cleaned_args[i]);
         }
 
-        result = evaluate(argc - 1, cleaned_args, &error);        
+        result = evaluate(argc - 1, cleaned_args, &error);
 
         for (int i = 0; i < argc - 1; ++i) {
             free(cleaned_args[i]);
         }
-            
+
         free(cleaned_args);
     }
 
@@ -464,7 +471,7 @@ int main(int argc, char* argv[]) {
         printf("Error: Invalid expression\n");
         return 1;
     }
-    // output according to equation type and max decimals    
+    // output according to equation type and max decimals
     int maxDecLocal = 0;
     expr_ptr = argv[1];  // reset expression pointer to beginning
     max_decimals(&maxDecLocal);
