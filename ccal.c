@@ -176,10 +176,39 @@ void FormatOutput(const char* expr, double result, char* fin_str) {
     else {
         hasDec = 1;
         maxDec = localMaxDec;
+        
+        // Format with appropriate precision first
+        char temp_str[64];
         if (maxDec <= 2)
-            snprintf(fin_str, 64, "%.2f", result);
+            snprintf(temp_str, 64, "%.2f", result);
         else
-            snprintf(fin_str, 64, "%.*f", maxDec, result);
+            snprintf(temp_str, 64, "%.*f", maxDec, result);
+            
+        // Check if the result is effectively an integer (decimal part is all zeros)
+        char* dot_pos = strchr(temp_str, '.');
+        if (dot_pos != NULL) {
+            // Check if all characters after decimal point are zeros
+            char* p = dot_pos + 1;
+            int all_zeros = 1;
+            while (*p != '\0') {
+                if (*p != '0') {
+                    all_zeros = 0;
+                    break;
+                }
+                p++;
+            }
+            
+            // If all decimal digits are zeros, format as integer
+            if (all_zeros) {
+                // Extract the integer part and format without decimal
+                *dot_pos = '\0';  // Terminate string at decimal point
+                strcpy(fin_str, temp_str);
+            } else {
+                strcpy(fin_str, temp_str);
+            }
+        } else {
+            strcpy(fin_str, temp_str);
+        }
         // Note 63 Leveraging snprintf with a precision field (%.*f) is a powerful technique when formatting rules depend on runtime analysis rather than fixed templates.
     }
 }
