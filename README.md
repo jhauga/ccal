@@ -1,226 +1,219 @@
-# ccal![repo icon](assets/icon.png)
+# ccal ![repo icon](assets/icon.png)
 
-Simple GUI (*Windows OS only*) and command line calculator, allowing for long mathematical expressions.
+A flexible calculator that ships with a Windows GUI front end and a cross-platform CLI. Both layers share the same C parser so complex expressions behave identically.
 
 ## Requirements:
 
-For Apple, Linux, and Windows the GNU compile tool `gcc` is required.
+All platforms require the GNU compiler `gcc`.
 
-**NOTE** - for Windows `cygwin` will be used to install gcc.
+> **Windows note:** the easiest path to `gcc` is through Cygwin.
 
-### Apple:
+### Apple
 
-**NOTE** - command line tool only.
+The CLI can be compiled on macOS. Install the toolchain via Homebrew:
 
-Using `Homebrew` to install.
-
-```
+```bash
 brew install gcc
 ```
 
-### Linux:
+### Linux
 
-**NOTE** - command line tool only.
+The CLI runs on common Linux distributions. Install the essentials with `apt`:
 
-Using common distro package manager `apt`.
-
-```
-sudo apt update 
+```bash
+sudo apt update
 sudo apt install build-essential
 ```
 
 To write changes to `help.txt`, you'll need `xxd`.
 
-```
+```bash
 sudo apt install xxd
 ```
 
-### Windows:
+### Windows
 
-First use Windows package manager `winget` to install `cygwin`.
+First, use Windows Package Manager (`winget`) to install Cygwin:
 
-```
+```bash
 winget install Cygwin.Cygwin
 ```
 
-Next download the makeshift package manager [setup-x86_64.exe](https://cygwin.com/install.html) for 
-`cygwin`, moving it to `/usr/bin` or another location where it can be called from command line, 
-and install gcc using:
+Next, download the Cygwin installer [setup-x86_64.exe](https://cygwin.com/install.html). Move it to
+`/usr/bin` (or another location on your `PATH`) so it can be invoked from the command prompt, then
+install `gcc`:
 
-```
+```bash
 setup-x86_64.exe -P gcc-core
 ```
 
 To write changes to `help.txt`, you'll need `xxd`.
 
-```
+```bash
 setup-x86_64.exe -P xxd
 ```
 
-then follow the prompts until you reach the "Select Packages" window of the GUI installer. 
+Follow the installer prompts until you reach **Select Packages**.
 
-**NOTE** - if you do not see the `gcc-core` package in the results, perform a search 
-for `gcc-core`, then select it, click next, and finish the install process.
+> If `gcc-core` is not listed, search for it, mark it for installation, then continue.
 
-## Compile Command Line Tool:
+## Compile Command Line Tool
 
-**NOTE** - Compatible with Mac OS, Linux, and Windows.
+The CLI builds on macOS, Linux, and Windows. Compile the core engine:
 
-To use the command line tool, compile engine ccal.c:
-
-```
+```bash
 gcc ccal.c -o ccal.exe
 ```
 
-and done.
+To include updates to `help.txt`, regenerate the header before compiling:
 
-**NOTE** - to include changes to `help.txt`, run:
-
-```
+```bash
 xxd -i help.txt > help.h
 ```
 
-before compiling.
+This embeds the latest help text in the executable.
 
 ## Compile GUI:
 
-**NOTE** - Compatible with Windows only.
+### Clone the repository
 
-### Clone Repo:
+Start by cloning the code and switching into the working directory:
 
-First clone this repository, and change into the directory:
-
-```
+```bash
 git clone https://github.com/jhauga/ccal.git
 cd ccal
 ```
 
-### Simplest Compile Method: 
+### Simplest build (no resources)
 
-This compiles without any resources:
+Compile the GUI without bundling extra resources:
 
-```
+```bash
 gcc -DBUILDING_GUI ccal.c ccal_gui.c -o ccal_gui.exe -mwindows
 ```
 
-and done.
+### Build with resources (icon, etc.)
 
-### Compile Including Resources:
+First compile the resource script into a COFF object:
 
-Compile with resources (*app icon*).
-
-Compile `.rc` to get a `.res` object.
-
-```
+```bash
 windres ccal_gui.rc -O coff -o ccal_gui.res
 ```
 
-Then - build, linking resource object:
+Then link the GUI, resource object, and core engine together:
 
-```
+```bash
 gcc -DBUILDING_GUI ccal_gui.c ccal.c ccal_gui.res -o ccal_gui.exe -mwindows
 ```
 
-and done.
+## GUI Usage (Windows)
 
-## GUI Usage:
+1. Launch `ccal_gui.exe` from Explorer or the command line.
+2. Enter expressions using the on-screen buttons or the keyboard.
+3. Press `Enter` or click `=` to evaluate.
+4. Press `d` to clear the current expression and result.
+5. Use `Ctrl + C` to copy the result to the clipboard.
 
-**NOTE** - Windows only.
+Comma formatting is applied automatically while you type, and backspace/delete skip over commas so numbers stay nicely grouped.
 
-To use the GUI version of the application, double click or call the compiled
-file. Once the window opens, click the buttons or use the keyboard to input
-the mathematical expression. Press `Enter` or click `=` to calculate the
-expression. Press `d` to clear the contents of the expression and calculation.
-Use `ctrl + c` to copy the calculation to the clipboard.
+## Command Line Usage
 
-## Command Line Usage:
+To use the CLI, pass digits, arithmetic operators, and nesting characters (`(`, `)`, `{`, `}`, `[`, `]`) separated with spaces.
 
-To use as a command line tool; pass digits, arithmetic operators, and nesting characters 
-(`(`, `)`, `{`, `}`, `[`, `]`) separated with a space.
+> **Important:** use `x` instead of `*`, and `p` instead of `^`, unless you pass `-q/--quote`.
 
-**IMPORTANT NOTE** - use `x` instead of `*` for multiplication when `-q, --quote` is not used. 
+### Acceptable Arithmetic Operators
 
-**IMPORTANT NOTE** - use `p` instead of `^` for exponentiation when `-q, --quote` is not used. 
+```text
++  -> addition
+-  -> subtraction
+/  -> division
+x  -> multiplication
+*  -> multiplication (use -q/--quote)
+p  -> exponentiation (power of)
+^  -> exponentiation (use -q/--quote)
+```
 
-###  Acceptable Arithmetic Operators:
-
-    +  ->  addition
-    -  ->  subtraction
-    /  ->  division
-    x  ->  multiplication
-    *  ->  multiplication (NOTE - use -q, --quote to use)
-    p  ->  exponentiation (power of)
-    ^  ->  exponentiation (NOTE - use -q, --quote to use) 
-
-### Command Line Use Examples:
+### Command Line Use Examples
 
 To use the command line tool either input all elements of the equation separated with a space
 character, or use the quote option `-q, --quote` which does not require elements to be separated
 with a space character.
 
-**NOTE** - if errors occur with nest characters, escape or wrap in double quotes. 
-
-**NOTE** - best to use `[` and `]` as nest characters
+> If nested brackets cause argument parsing issues, escape them or wrap the expression in quotes. Square brackets generally require the fewest escapes.
 
 Add two numbers:
 
-    > ccal 1 + 1
-    > 2
+```bash
+> ccal 1 + 1
+> 2
+```
 
 Perform a complex equation:
 
-    > ccal [ [ 34 x 11 ] / [ 10 - 5 ] ] - [ 4 x 53 x [ 30 / 10 ] ]
-    > -561.2
+```bash
+> ccal [ [ 34 x 11 ] / [ 10 - 5 ] ] - [ 4 x 53 x [ 30 / 10 ] ]
+> -561.2
+```
 
-**NOTE** - issue with order of operations, so something such as:
+> Without `-q/--quote`, order of operations can break across spaced tokens, so expressions like:
 
-    > ccal [ [ 34 x 11 ] / [ 10 - 5 ] ] - [ 4 x 53 x [ 30 / 10 ] + [ 2 x [ 40 - 20 ] ] ] / [ 8 x 6 x [ 12 / 2 ] + 4 ]
-    > -2.058904109589041
+```bash
+> ccal [ [ 34 x 11 ] / [ 10 - 5 ] ] - [ 4 x 53 x [ 30 / 10 ] + [ 2 x [ 40 - 20 ] ] ] / [ 8 x 6 x [ 12 / 2 ] + 4 ]
+> -2.058904109589041
+```
 
-will be incorrect (*correct is `72.4849`*). So instead, use the quote option `-q, --quote` (*suggested*), 
-or manually apply order of operations with nesting characters to force the correct order of operations:
+will evaluate incorrectly (the correct answer is `72.4849`). Use `-q/--quote`—recommended—or add explicit parentheses to force the intended precedence:
 
-#### Quote Option (*suggested*):
+**Quote option (recommended):**
 
-    > ccal -q "[[34x11]/[10-5]]-[4x53x[30/10]+[2x[40-20]]]/[8x6x[12/2]+4]"
-    > 72.48493150684931
-    
-#### Manually Apply Order of Operations:
-    
-    > ccal [ [ 34 x 11 ] / [ 10 - 5 ] ] - [ [ [ 4 x 53 ] x [ 30 / 10 ] + [ 2 x [ 40 - 20 ] ] ] / [ 8 x 6 x [ 12 / 2 ] + 4 ] ]
-    > 72.48493150684931
+```bash
+> ccal -q "[[34x11]/[10-5]]-[4x53x[30/10]+[2x[40-20]]]/[8x6x[12/2]+4]"
+> 72.48493150684931
+```
 
-in order to get the correct answer.
+**Manual grouping:**
 
-**NOTE** - terminal handling of command line arguments requires numbers with commas to be wrapped 
-in double quotes, but this can be bypassed using the quote option `-q, --quote`. So instead of:
+```bash
+> ccal [ [ 34 x 11 ] / [ 10 - 5 ] ] - [ [ [ 4 x 53 ] x [ 30 / 10 ] + [ 2 x [ 40 - 20 ] ] ] / [ 8 x 6 x [ 12 / 2 ] + 4 ] ]
+> 72.48493150684931
+```
 
-    > ccal 1,000 - 1
-    > Error: Invalid expression
+Both approaches return the correct value.
 
-use the quote option `-q, --quote` (*suggested*), or manually wrap comma numbers:
+> Terminals treat commas as separators, so wrap comma-separated numbers in quotes or use `-q/--quote`. Instead of:
 
-#### Quote Option (*suggested*):
+```bash
+> ccal 1,000 - 1
+> Error: Invalid expression
+```
 
-    > ccal --quote "2,000-1,000"
-    > 1000
-    
-#### Manually Wrap Comma Numbers:
+Use the quote option or wrap comma numbers manually:
 
-    > ccal "2,000" - "1,000"
-    > 1000
+**Quote option:**
+
+```bash
+> ccal --quote "2,000-1,000"
+> 1000
+```
+
+**Manual quoting:**
+
+```bash
+> ccal "2,000" - "1,000"
+> 1000
+```
 
 to get the correct calculation.
 
-#### Calculate Exponentiation:
+### Calculate Exponentiation
 
-To calculate the exponentiation (*power of*) use `p` as the operator. If using the `-q, --quote`
-option, both the `p` and `^` character can be used as the operator.
+To calculate exponentiation, use `p` as the operator. With `-q/--quote`, you can also use `^`.
 
-    > ccal 2 p 2
-    > 4
+```bash
+> ccal 2 p 2
+> 4
 
-#### Quote Option (*suggested*):
-
-    > ccal --quote "2^2"
-    > 4
+> ccal --quote "2^2"
+> 4
+```
