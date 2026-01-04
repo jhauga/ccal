@@ -24,8 +24,27 @@ extern double evaluate_expr_string(const char* expr, int* error);
 #define ID_INPUT   1
 #define ID_OUTPUT  2
 #define ID_EQUAL   3
+#define ID_HISTORY 4
 
-HWND hwnd, hInput, hOutput;  // handles to input and output controls
+// History panel constants
+#define MAX_HISTORY 100
+#define HISTORY_MIN_WIDTH 700  // minimum window width to show history
+#define HISTORY_WIDTH 400
+#define HISTORY_ITEM_HEIGHT 20
+#define HISTORY_COLUMNS 4
+#define HISTORY_ROWS_PER_COL 10
+
+// History entry structure
+typedef struct {
+    char equation[256];
+    int active;
+} HistoryEntry;
+
+HistoryEntry gHistory[MAX_HISTORY];
+int gHistoryCount = 0;
+int gHistoryHoverIndex = -1;
+
+HWND hwnd, hInput, hOutput, hHistory;  // handles to input, output, and history controls
 WNDPROC DefaultEditProc;
 // Subclassing relies on saving the original procedure so we can hand control
 // back to Windows when our custom logic has finished processing a message.
@@ -51,6 +70,11 @@ static char gStoredEquation[512];
 static void FormatEntireEquation(HWND hWnd);
 static void FormatCurrentNumberSegment(HWND hWnd);
 static void ApplyPendingFullFormat(HWND hWnd, int formatSegment);
+static void AddToHistory(const char* equation);
+static void DrawHistory(HDC hdc, RECT* rect);
+static int GetHistoryItemAtPoint(int x, int y, RECT* clientRect);
+static void UpdateHistoryVisibility(int width);
+void FocusOnInput();
 
 // SUPPORT FUNCTIONS:
 //////////////////////////////////////////////////////////////////////////////
@@ -397,6 +421,178 @@ static void ApplyPendingFullFormat(HWND hWnd, int formatSegment) {
     }
 }
 
+// Add calculation to history
+static void AddToHistory(const char* equation) {
+    if (gHistoryCount < MAX_HISTORY) {
+        strncpy(gHistory[gHistoryCount].equation, equation, sizeof(gHistory[gHistoryCount].equation) - 1);
+        gHistory[gHistoryCount].equation[sizeof(gHistory[gHistoryCount].equation) - 1] = '\0';
+        gHistory[gHistoryCount].active = 1;
+        gHistoryCount++;
+    } else {
+        // Shift all entries down to make room for new one
+        for (int i = 0; i < MAX_HISTORY - 1; i++) {
+            gHistory[i] = gHistory[i + 1];
+        }
+        strncpy(gHistory[MAX_HISTORY - 1].equation, equation, sizeof(gHistory[MAX_HISTORY - 1].equation) - 1);
+        gHistory[MAX_HISTORY - 1].equation[sizeof(gHistory[MAX_HISTORY - 1].equation) - 1] = '\0';
+        gHistory[MAX_HISTORY - 1].active = 1;
+    }
+    if (hHistory)
+        InvalidateRect(hHistory, NULL, TRUE);
+}
+
+// Get history item index at mouse position
+static int GetHistoryItemAtPoint(int x, int y, RECT* clientRect) {
+    int colWidth = clientRect->right / HISTORY_COLUMNS;
+    int col = x / colWidth;
+    int row = y / HISTORY_ITEM_HEIGHT;
+    
+    int availableHeight = clientRect->bottom - clientRect->top;
+    int rowsPerCol = (availableHeight - 10) / HISTORY_ITEM_HEIGHT;  // Dynamic row calculation
+    
+    if (rowsPerCol < 1)
+        rowsPerCol = 1;
+    
+    if (col >= HISTORY_COLUMNS || row >= rowsPerCol)
+        return -1;
+    
+    // Items are displayed from newest (top-left) going down, then to next column
+    int index = gHistoryCount - 1 - (col * rowsPerCol + row);
+    
+    if (index >= 0 && index < gHistoryCount)
+        return index;
+    
+    return -1;
+}
+
+// Draw history panel
+static void DrawHistory(HDC hdc, RECT* rect) {
+    // Fill background
+    HBRUSH bgBrush = CreateSolidBrush(RGB(245, 245, 245));
+    FillRect(hdc, rect, bgBrush);
+    DeleteObject(bgBrush);
+    
+    SetBkMode(hdc, TRANSPARENT);
+    SetTextColor(hdc, RGB(0, 0, 0));
+    
+    int colWidth = rect->right / HISTORY_COLUMNS;
+    int availableHeight = rect->bottom - rect->top;
+    int rowsPerCol = (availableHeight - 10) / HISTORY_ITEM_HEIGHT;  // Dynamic row calculation
+    
+    if (rowsPerCol < 1)
+        rowsPerCol = 1;
+    
+    // Draw items from newest to oldest, left to right, top to bottom
+    for (int i = 0; i < gHistoryCount; i++) {
+        int itemIndex = gHistoryCount - 1 - i;
+        int col = i / rowsPerCol;
+        int row = i % rowsPerCol;
+        
+        if (col >= HISTORY_COLUMNS)
+            break;
+        
+        RECT itemRect;
+        itemRect.left = col * colWidth + 5;
+        itemRect.top = row * HISTORY_ITEM_HEIGHT + 5;
+        itemRect.right = (col + 1) * colWidth - 5;
+        itemRect.bottom = (row + 1) * HISTORY_ITEM_HEIGHT - 2;
+        
+        // Highlight on hover
+        if (itemIndex == gHistoryHoverIndex) {
+            HBRUSH hoverBrush = CreateSolidBrush(RGB(220, 235, 255));
+            FillRect(hdc, &itemRect, hoverBrush);
+            DeleteObject(hoverBrush);
+            
+            HPEN borderPen = CreatePen(PS_SOLID, 1, RGB(100, 150, 200));
+            HPEN oldPen = (HPEN)SelectObject(hdc, borderPen);
+            Rectangle(hdc, itemRect.left - 1, itemRect.top - 1, itemRect.right + 1, itemRect.bottom + 1);
+            SelectObject(hdc, oldPen);
+            DeleteObject(borderPen);
+        }
+        
+        DrawText(hdc, gHistory[itemIndex].equation, -1, &itemRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    }
+}
+
+// Update history panel visibility based on window width
+static void UpdateHistoryVisibility(int width) {
+    if (hHistory) {
+        if (width >= HISTORY_MIN_WIDTH) {
+            ShowWindow(hHistory, SW_SHOW);
+        } else {
+            ShowWindow(hHistory, SW_HIDE);
+        }
+    }
+}
+
+// History window procedure
+LRESULT CALLBACK HistoryProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+        case WM_PAINT: {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hWnd, &ps);
+            RECT rect;
+            GetClientRect(hWnd, &rect);
+            DrawHistory(hdc, &rect);
+            EndPaint(hWnd, &ps);
+            return 0;
+        }
+        case WM_MOUSEMOVE: {
+            RECT rect;
+            GetClientRect(hWnd, &rect);
+            int x = LOWORD(lParam);
+            int y = HIWORD(lParam);
+            int newHoverIndex = GetHistoryItemAtPoint(x, y, &rect);
+            
+            if (newHoverIndex != gHistoryHoverIndex) {
+                gHistoryHoverIndex = newHoverIndex;
+                InvalidateRect(hWnd, NULL, TRUE);
+            }
+            
+            // Track mouse leave to clear hover state when mouse exits window
+            TRACKMOUSEEVENT tme;
+            tme.cbSize = sizeof(TRACKMOUSEEVENT);
+            tme.dwFlags = TME_LEAVE;
+            tme.hwndTrack = hWnd;
+            TrackMouseEvent(&tme);
+            
+            return 0;
+        }
+        case WM_MOUSELEAVE: {
+            if (gHistoryHoverIndex != -1) {
+                gHistoryHoverIndex = -1;
+                InvalidateRect(hWnd, NULL, TRUE);
+            }
+            return 0;
+        }
+        case WM_LBUTTONDOWN: {
+            RECT rect;
+            GetClientRect(hWnd, &rect);
+            int x = LOWORD(lParam);
+            int y = HIWORD(lParam);
+            int clickedIndex = GetHistoryItemAtPoint(x, y, &rect);
+            
+            if (clickedIndex >= 0 && clickedIndex < gHistoryCount) {
+                // Extract just the equation part (before the '=')
+                char equation[256];
+                strncpy(equation, gHistory[clickedIndex].equation, sizeof(equation) - 1);
+                equation[sizeof(equation) - 1] = '\0';
+                
+                // Find the '=' and truncate there
+                char* equalSign = strstr(equation, " = ");
+                if (equalSign)
+                    *equalSign = '\0';
+                
+                SetWindowText(hInput, equation);
+                SetWindowText(hOutput, "");
+                FocusOnInput();
+            }
+            return 0;
+        }
+    }
+    return DefWindowProc(hWnd, msg, wParam, lParam);
+}
+
 // Create a button with given label and position, parent window and ID
 void AddButton(HWND parent, const char* label, int x, int y, int id) {
     // Buttons are child windows too, so we pass the parent handle and position
@@ -528,6 +724,11 @@ LRESULT CALLBACK InputProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 // ready output rendering
                 FormatOutput(buffer, result, result_str);
                 SetWindowText(hOutput, result_str);
+                
+                // Add to history
+                char historyEntry[512];
+                snprintf(historyEntry, sizeof(historyEntry), "%s = %s", buffer, result_str);
+                AddToHistory(historyEntry);
             }
             return 0; // handled
         }
@@ -610,29 +811,27 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             // Layout happens once when the window is created. We construct the
             // input edit control first so other helpers like FocusOnInput work
             // later in initialization.
+            // Use consistent margin for left, right, and bottom
+            int margin = 10;
+            
             // create input edit control
             hInput = CreateWindow("EDIT", "",
                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
-                10, 10, 380, 25,
+                margin, 10, 260, 25,
                 hwnd, (HMENU)ID_INPUT, NULL, NULL);
-
-            // behave more like a label
-            SendMessage(hOutput, EM_SETREADONLY, TRUE, 0);
-
-            // At this point hOutput has not been created yet, so in production
-            // code the read-only flag should be applied after the static
-            // control is instantiated. The call is harmless because the handle
-            // is null, but it is worth keeping execution order in mind.
 
             // create output static text control
             hOutput = CreateWindow("STATIC", "",
                 WS_CHILD | WS_VISIBLE | SS_LEFT,
-                10, 40, 380, 25,
+                margin, 40, 260, 25,
                 hwnd, (HMENU)ID_OUTPUT, NULL, NULL);
+
+            // behave more like a label
+            SendMessage(hOutput, EM_SETREADONLY, TRUE, 0);
 
             // create digit buttons 0-9 in four rows of 3 buttons each
             int row = 120;
-            int x = 45;
+            int x = margin + 35;  // start buttons with proper left margin
             for (int i = 0; i <= 11; ++i) {
                 char label[2] = { '0' + i, 0 };
 
@@ -641,7 +840,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 // add buttons
                 if (i == 0) {
                     AddButton(hwnd, label,
-                        90, 200,
+                        margin + 80, 200,
                         10 + i
                     );
                 }
@@ -653,13 +852,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 }
                 else if (i == 10) {
                     AddButton(hwnd, "c",
-                        45, 200,
+                        margin + 35, 200,
                         10 + i
                     );
                 }
                 else if (i == 11) {
                     AddButton(hwnd, ".",
-                        135, 200,
+                        margin + 125, 200,
                         10 + i
                     );
                 }
@@ -669,8 +868,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     row += 40;
                 }
                 if (i != 0) {
-                    if (x >= 135) {
-                        x = 45;
+                    if (x >= margin + 125) {
+                        x = margin + 35;
                     }
                     else {
                         x += 45;
@@ -679,20 +878,26 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
 
             // create operator buttons
-            AddButton(hwnd, "+", 190, 80, 30);
-            AddButton(hwnd, "-", 230, 80, 31);
-            AddButton(hwnd, "x", 190, 120, 32);
-            AddButton(hwnd, "/", 230, 120, 33);
-            AddButton(hwnd, "^", 230, 160, 34);
+            AddButton(hwnd, "+", margin + 180, 80, 30);
+            AddButton(hwnd, "-", margin + 220, 80, 31);
+            AddButton(hwnd, "x", margin + 180, 120, 32);
+            AddButton(hwnd, "/", margin + 220, 120, 33);
+            AddButton(hwnd, "^", margin + 220, 160, 34);
 
             // Operator buttons feed simple single-character strings so the
             // edit control can reuse the same formatting path as keyboard input.
 
             // create "=" and "+/-" button to evaluate and negate evaluation
-            AddButton(hwnd, "+/-", 190, 160, 35);
-            AddButton(hwnd, "=",   190, 200, ID_EQUAL);
+            AddButton(hwnd, "+/-", margin + 180, 160, 35);
+            AddButton(hwnd, "=",   margin + 180, 200, ID_EQUAL);
 
             DefaultEditProc = (WNDPROC)SetWindowLongPtr(hInput, GWLP_WNDPROC, (LONG_PTR)InputProc);
+
+            // Create history panel (initially hidden)
+            hHistory = CreateWindow("HistoryPanel", "",
+                WS_CHILD | WS_BORDER,
+                280, 10, HISTORY_WIDTH, 285,
+                hwnd, (HMENU)ID_HISTORY, NULL, NULL);
 
             break;
         }
@@ -779,6 +984,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     // ready output rendering
                     FormatOutput(buffer, result, result_str);
                     SetWindowText(hOutput, result_str);  // show result
+                    
+                    // Add to history
+                    char historyEntry[512];
+                    snprintf(historyEntry, sizeof(historyEntry), "%s = %s", buffer, result_str);
+                    AddToHistory(historyEntry);
+                    
                     FocusOnInput();
                 }
             }
@@ -892,6 +1103,53 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             break;
         }
+        // set minimum window size
+        case WM_GETMINMAXINFO: {
+            MINMAXINFO* mmi = (MINMAXINFO*)lParam;
+            // Calculate minimum window size for client area of 280x300
+            RECT minRect = {0, 0, 310, 250};
+            AdjustWindowRect(&minRect, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME | WS_MAXIMIZEBOX, FALSE);
+            mmi->ptMinTrackSize.x = minRect.right - minRect.left;
+            mmi->ptMinTrackSize.y = minRect.bottom - minRect.top;
+            return 0;
+        }
+        // handle window resize
+        case WM_SIZE: {
+            if (hInput && hOutput) {
+                int width = LOWORD(lParam);
+                int height = HIWORD(lParam);
+                
+                // Use equal margins on left, right, and bottom
+                int margin = 10;
+                
+                // Update history panel visibility
+                UpdateHistoryVisibility(width);
+                
+                // Calculate available width for calculator
+                int calcWidth = 280;  // fixed calculator width
+                int availableWidth = width - (2 * margin);
+                
+                if (width >= HISTORY_MIN_WIDTH && hHistory) {
+                    // Show history panel on the right
+                    int historyWidth = width - calcWidth - (3 * margin);
+                    if (historyWidth > HISTORY_WIDTH)
+                        historyWidth = HISTORY_WIDTH;
+                    
+                    MoveWindow(hInput, margin, 10, calcWidth, 25, TRUE);
+                    MoveWindow(hOutput, margin, 40, calcWidth, 25, TRUE);
+                    MoveWindow(hHistory, calcWidth + (2 * margin), 10, historyWidth, height - 20, TRUE);
+                } else {
+                    // No history panel, use available width for input/output
+                    if (availableWidth < calcWidth)
+                        availableWidth = calcWidth;
+                    MoveWindow(hInput, margin, 10, availableWidth, 25, TRUE);
+                    MoveWindow(hOutput, margin, 40, availableWidth, 25, TRUE);
+                }
+                
+                // Buttons remain fixed position
+            }
+            break;
+        }
         // handle keyboard input
         case WM_CHAR: {
             // handle keyboard input for digits, decimal point, operators, and brackets
@@ -954,6 +1212,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     // ready output rendering
                     FormatOutput(buffer, result, result_str);
                     SetWindowText(hOutput, result_str);  // show result
+                    
+                    // Add to history
+                    char historyEntry[512];
+                    snprintf(historyEntry, sizeof(historyEntry), "%s = %s", buffer, result_str);
+                    AddToHistory(historyEntry);
+                    
                     dec = 0;
                     equ = 1;
                 }
@@ -969,6 +1233,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             // Always unregister hotkeys you registered, otherwise Windows will
             // keep them bound and the next instance will fail to claim them.
             UnregisterHotKey(hwnd, 1);
+            
+            // Child windows are automatically destroyed, but we clear the handle
+            if (hHistory) {
+                hHistory = NULL;
+            }
+            
             PostQuitMessage(0);  // exit message loop
             break;
         }
@@ -996,11 +1266,29 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdSh
     // RegisterClassEx wires up our message handler and appearance. Without it,
     // CreateWindow would fail because the class name would be unknown to the OS.
     RegisterClassEx(&wc);
+    
+    // Register history panel window class
+    WNDCLASSEX histWc = { 0 };
+    histWc.cbSize = sizeof(WNDCLASSEX);
+    histWc.lpfnWndProc = HistoryProc;
+    histWc.hInstance = hInst;
+    histWc.lpszClassName = "HistoryPanel";
+    histWc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    histWc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    RegisterClassEx(&histWc);
 
     // create main window
+    // Calculate window size to accommodate client area with proper borders
+    // Default width includes calculator (280px) + history panel (400px) + margins
+    int initialWidth = 280 + HISTORY_WIDTH + 30;  // calculator + history + margins
+    RECT rect = {0, 0, initialWidth, 300};
+    AdjustWindowRect(&rect, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME | WS_MAXIMIZEBOX, FALSE);
+    int windowWidth = rect.right - rect.left;
+    int windowHeight = rect.bottom - rect.top;
+    
     HWND hwnd = CreateWindow("CalcGUI", "ccal",
-                WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-                CW_USEDEFAULT, CW_USEDEFAULT, 400, 300, // width, height
+                WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME | WS_MAXIMIZEBOX,
+                CW_USEDEFAULT, CW_USEDEFAULT, windowWidth, windowHeight,
                 NULL, NULL, hInst, NULL);
 
     if (!hwnd) return 1;
@@ -1020,6 +1308,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdSh
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
+
+    // Clean up window classes
+    UnregisterClass("HistoryPanel", hInst);
+    UnregisterClass("CalcGUI", hInst);
 
     return 0;
 }
