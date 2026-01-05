@@ -25,6 +25,7 @@ extern double evaluate_expr_string(const char* expr, int* error);
 #define ID_OUTPUT  2
 #define ID_EQUAL   3
 #define ID_HISTORY 4
+#define ID_CLEAR_HISTORY 5
 
 // History panel constants
 #define MAX_HISTORY 100
@@ -45,6 +46,8 @@ int gHistoryCount = 0;
 int gHistoryHoverIndex = -1;
 
 HWND hwnd, hInput, hOutput, hHistory;  // handles to input, output, and history controls
+HWND hClearHistBtn;  // handle to clear history button for custom font
+HFONT hSmallFont;    // smaller font for clear history button
 WNDPROC DefaultEditProc;
 // Subclassing relies on saving the original procedure so we can hand control
 // back to Windows when our custom logic has finished processing a message.
@@ -594,11 +597,11 @@ LRESULT CALLBACK HistoryProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 }
 
 // Create a button with given label and position, parent window and ID
-void AddButton(HWND parent, const char* label, int x, int y, int id) {
+HWND AddButton(HWND parent, const char* label, int x, int y, int id) {
     // Buttons are child windows too, so we pass the parent handle and position
     // in client coordinates to keep layout relative to the calculator frame.
-    CreateWindow("BUTTON", label,
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+    return CreateWindow("BUTTON", label,
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_MULTILINE,
         x, y, 40, 30,
         parent, (HMENU)(intptr_t)id, NULL, NULL);
 }
@@ -887,9 +890,29 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             // Operator buttons feed simple single-character strings so the
             // edit control can reuse the same formatting path as keyboard input.
 
-            // create "=" and "+/-" button to evaluate and negate evaluation
+            // create "=", "+/-", and "Clear Hist." buttons
             AddButton(hwnd, "+/-", margin + 180, 160, 35);
             AddButton(hwnd, "=",   margin + 180, 200, ID_EQUAL);
+            hClearHistBtn = AddButton(hwnd, "Clear\r\nHist.", margin + 220, 200, ID_CLEAR_HISTORY);
+            
+            // Create smaller font for Clear Hist. button (2pt smaller than default)
+            hSmallFont = CreateFont(
+                -10,                        // Height (negative for character height)
+                0,                          // Width
+                0,                          // Escapement
+                0,                          // Orientation
+                FW_NORMAL,                  // Weight
+                FALSE,                      // Italic
+                FALSE,                      // Underline
+                FALSE,                      // StrikeOut
+                DEFAULT_CHARSET,            // CharSet
+                OUT_DEFAULT_PRECIS,         // OutputPrecision
+                CLIP_DEFAULT_PRECIS,        // ClipPrecision
+                DEFAULT_QUALITY,            // Quality
+                DEFAULT_PITCH | FF_DONTCARE,// PitchAndFamily
+                "MS Shell Dlg"              // Facename
+            );
+            SendMessage(hClearHistBtn, WM_SETFONT, (WPARAM)hSmallFont, TRUE);
 
             DefaultEditProc = (WNDPROC)SetWindowLongPtr(hInput, GWLP_WNDPROC, (LONG_PTR)InputProc);
 
@@ -1034,6 +1057,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     ApplyPendingFullFormat(hInput, 0);
                     FocusOnInput();
                 }
+            }
+            else if (LOWORD(wParam) == ID_CLEAR_HISTORY) {
+                // Clear history button clicked: reset history
+                gHistoryCount = 0;
+                gHistoryHoverIndex = -1;
+                if (hHistory)
+                    InvalidateRect(hHistory, NULL, TRUE);
+                FocusOnInput();
             }
 
             break;
@@ -1233,6 +1264,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             // Always unregister hotkeys you registered, otherwise Windows will
             // keep them bound and the next instance will fail to claim them.
             UnregisterHotKey(hwnd, 1);
+            
+            // Clean up font resource
+            if (hSmallFont) {
+                DeleteObject(hSmallFont);
+                hSmallFont = NULL;
+            }
             
             // Child windows are automatically destroyed, but we clear the handle
             if (hHistory) {
