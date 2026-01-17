@@ -309,24 +309,26 @@ ccal -m converter temperature 100 C F
 ccal -m converter 100 C F
 ```
 
-### Module Structureall JSON rules in `rules/converter/` are embedded directly into the executable using generated header files. This allows the converter to:
-- Work from any directory without needing access to external JSON files
-- Auto-detect which rule to use based on the units provided
-- Support multiple conversion types (length, temperature, etc.) seamlessly
-
-Use the `build_rules.bat` (Windows) or `build_rules.sh` (macOS/Linux) script to automatically generate headers for all ru
+### Module Structure
 
 The converter system uses:
 
 - **`modules/`** - Contains converter implementation code
   - `converter.c` - Core conversion engine
   - `converter.h` - Function declarations and structures
-  - `length_rules.h` - Embedded length rules (generated from JSON)
+  - `length_rules.h`, `temperature_rules.h` - Embedded rules (generated from JSON)
+  - `rules.h` - Master header that includes all rule files
 - **`rules/`** - Contains JSON rule files for different conversion types
   - `converter/length.json` - Length/distance conversion rules
+  - `converter/temperature.json` - Temperature conversion rules
   - Users can add custom rule files following the same format
 
-**Embedded Rules:** When compiled with `-DUSE_EMBEDDED_RULES`, the JSON rules are embedded directly into the executable using generated header files. This allows the converter to work from any directory without needing access to external JSON files.
+**Embedded Rules:** When compiled with `-DUSE_EMBEDDED_RULES`, all JSON rules in `rules/converter/` are embedded directly into the executable using generated header files. This allows the converter to:
+- Work from any directory without needing access to external JSON files
+- Auto-detect which rule to use based on the units provided
+- Support multiple conversion types (length, temperature, etc.) seamlessly
+
+Use the `build_rules.bat` (Windows) or `build_rules.sh` (macOS/Linux) script to automatically generate headers for all rules.
 
 ### Conversion Rules Format
 
@@ -350,6 +352,11 @@ Conversion rules are defined in JSON files with the following structure:
   - Creates GUI label: `inch(in)`
 - **`to`**: Conversion factors in the same order as the `converter` array
 
+### Compile Converter Module
+
+The converter is integrated into ccal. To compile with embedded rules:
+
+```bash
 # Generate all rule headers automatically
 .\build_rules.bat     # Windows
 ./build_rules.sh      # macOS/Linux
@@ -365,29 +372,12 @@ gcc ccal.c modules/converter.c -o ccal.exe
 ```
 
 **Adding New Rules:** To add a new conversion type:
+
 1. Create a JSON file in `rules/converter/` (e.g., `weight.json`)
 2. Run the build script: `.\build_rules.bat` or `./build_rules.sh`
 3. Add the new rule name to the `rule_names[]` array in `auto_detect_rule()` function in [modules/converter.c](modules/converter.c)
-4. Add a correspondin - generate headers first
-.\build_rules.bat
-gcc -DCONVERTER_STANDALONE -DUSE_EMBEDDED_RULES modules/converter.c -o converter.exe
-
-# With external rule files
-gcc -DCONVERTER_STANDALONE modules/converter.c -o converter.exe
-```
-
-**Note:** When adding new rules to standalone converter, update the `rule_names[]` array and switch statement in `auto_detect_rule()` function.
-
-To compile the converter as a standalone tool (for testing):
-
-```bash
-# With embedded rules
-xxd -i rules/converter/length.json > modules/length_rules.h
-gcc -DCONVERTER_STANDALONE -DUSE_EMBEDDED_RULES modules/converter.c -o converter.exe
-
-# With external rule files
-gcc -DCONVERTER_STANDALONE modules/converter.c -o converter.exe
-```
+4. Add a corresponding case in `load_embedded_conversion_rules()` function
+5. Recompile with `-DUSE_EMBEDDED_RULES`
 
 ### Standalone Converter Usage
 
@@ -403,8 +393,7 @@ Convert a value from one unit to another:
 Convert and display all available units:
 
 ```bash
-
-#### Length> converter 5 ft --all
+> converter 5 ft --all
 > 5.0000 ft =
 >   mm           : 1524.000000
 >   cm           : 152.400000
@@ -416,7 +405,9 @@ Convert and display all available units:
 >   mi           : 0.000945
 ```
 
-### Supported Units (Length)
+### Supported Units
+
+#### Length
 
 The length converter supports the following units with flexible naming:
 
@@ -427,8 +418,10 @@ The length converter supports the following units with flexible naming:
 - **Inch**: `in`, `inch` → `-in`, `--inch`
 - **Foot**: `ft`, `foot` → `-ft`, `--foot`
 - **Yard**: `yd`, `yard` → `-yd`, `--yard`
+- **Mile**: `mi`, `mile` → `-mi`, `--mile`
 
 #### Temperature
+
 The temperature converter supports the following units:
 
 - **Celsius**: `C`, `celsius` → `-C`, `--celsius`
@@ -436,7 +429,6 @@ The temperature converter supports the following units:
 - **Kelvin**: `K`, `kelvin` → `-K`, `--kelvin`
 
 Temperature conversions use both multiplication factors and offsets to handle the different scales correctly.
-- **Mile**: `mi`, `mile` → `-mi`, `--mile`
 
 All unit names are case-insensitive and support multiple aliases.
 
