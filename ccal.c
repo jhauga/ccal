@@ -578,17 +578,36 @@ int main(int argc, char* argv[]) {
 
     // Check for module flag: /M, -m, or --module
     if ((strcmp(argv[1], "/M") == 0 || strcmp(argv[1], "-m") == 0 || strcmp(argv[1], "--module") == 0)) {
-        if (argc < 7) {
-            fprintf(stderr, "Usage: ccal [/M|-m|--module] <module> <rule> <value> <from_unit> <to_unit>\n");
-            fprintf(stderr, "Example: ccal -m converter length 10 in cm\n");
+        if (argc < 6) {
+            fprintf(stderr, "Usage: ccal [/M|-m|--module] <module> [rule] <value> <from_unit> <to_unit>\n");
+            fprintf(stderr, "  With explicit rule:  ccal -m converter length 10 in cm\n");
+            fprintf(stderr, "  With auto-detection: ccal -m converter 10 in cm\n");
             return 1;
         }
         
         const char* module_name = argv[2];
-        const char* rule_name = argv[3];
-        double value = atof(argv[4]);
-        const char* from_unit = argv[5];
-        const char* to_unit = argv[6];
+        const char* rule_name = NULL;
+        double value;
+        const char* from_unit;
+        const char* to_unit;
+        
+        // Determine if rule name is provided or auto-detect
+        if (argc == 7) {
+            // Explicit rule: ccal -m converter length 10 in cm
+            rule_name = argv[3];
+            value = atof(argv[4]);
+            from_unit = argv[5];
+            to_unit = argv[6];
+        } else if (argc == 6) {
+            // Auto-detect: ccal -m converter 10 in cm
+            value = atof(argv[3]);
+            from_unit = argv[4];
+            to_unit = argv[5];
+        } else {
+            fprintf(stderr, "Error: Invalid number of arguments\n");
+            fprintf(stderr, "Usage: ccal [/M|-m|--module] <module> [rule] <value> <from_unit> <to_unit>\n");
+            return 1;
+        }
         
         // Only converter module is currently supported
         if (strcmp(module_name, "converter") != 0) {
@@ -597,17 +616,45 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         
+        // Load conversion rules
+        ConversionRules rules;
+        #ifdef USE_EMBEDDED_RULES
+        // Auto-detect rule if not provided
+        if (rule_name == NULL) {
+            rule_name = auto_detect_rule(from_unit, to_unit);
+            if (rule_name == NULL) {
+                fprintf(stderr, "Error: Could not auto-detect rule for units '%s' and '%s'\n", 
+                       from_unit, to_unit);
+                fprintf(stderr, "Available embedded rules: length, temperature\n");
+                fprintf(stderr, "Please specify the rule explicitly.\n");
+                return 1;
+            }
+        }
+        
+        // Use embedded rules (compiled into executable)
+        if (!load_embedded_conversion_rules(rule_name, &rules)) {
+            fprintf(stderr, "Error: Failed to load conversion rules for '%s'\n", rule_name);
+            fprintf(stderr, "Available embedded rules: length, temperature\n");
+            return 1;
+        }
+        #else
+        // For external rules, require explicit rule name
+        if (rule_name == NULL) {
+            fprintf(stderr, "Error: Rule name is required when using external rule files\n");
+            fprintf(stderr, "Usage: ccal -m converter <rule> <value> <from_unit> <to_unit>\n");
+            return 1;
+        }
+        
         // Build the path to the rule file
         char rule_path[256];
         snprintf(rule_path, sizeof(rule_path), "rules/converter/%s.json", rule_name);
         
-        // Load conversion rules
-        ConversionRules rules;
         if (!load_conversion_rules(rule_path, &rules)) {
             fprintf(stderr, "Error: Failed to load conversion rules from '%s'\n", rule_path);
             fprintf(stderr, "Make sure the rule file exists in the rules/converter/ directory\n");
             return 1;
         }
+        #endif
         
         // Perform conversion
         double result = convert_unit(&rules, value, from_unit, to_unit);

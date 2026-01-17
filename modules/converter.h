@@ -33,6 +33,10 @@ int parse_converter_array(const char* line, ConversionRules* rules);
 int parse_unit_name(const char* line, char* name_buffer);
 int parse_unit_to_array(const char* line, double* to_array, int* count);
 int load_conversion_rules(const char* filepath, ConversionRules* rules);
+#ifdef USE_EMBEDDED_RULES
+int load_embedded_conversion_rules(const char* rule_name, ConversionRules* rules);
+const char* auto_detect_rule(const char* from_unit, const char* to_unit);
+#endif
 int find_unit_by_name(const ConversionRules* rules, const char* name);
 double convert_unit(const ConversionRules* rules, double value, const char* from_unit, const char* to_unit);
 void print_available_units(const ConversionRules* rules);

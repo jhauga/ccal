@@ -61,11 +61,37 @@ Follow the installer prompts until you reach **Select Packages**.
 
 The CLI builds on macOS, Linux, and Windows. To compile with the converter module:
 
+### With Embedded Rules (Recommended)
+
+This method embeds the JSON rules into the executable, so it works from any directory:
+
+```bash
+# First, generate all embedded rule headers automatically
+.\build_rules.bat     # Windows
+# or
+./build_rules.sh      # macOS/Linux
+
+# Then compile with embedded rules flag
+gcc -DUSE_EMBEDDED_RULES ccal.c modules/converter.c -o ccal.exe
+```
+
+The build script automatically processes all JSON files in `rules/converter/` and generates:
+- Individual header files: `modules/length_rules.h`, `modules/temperature_rules.h`, etc.
+- Master header: `modules/rules.h` that includes all rule headers
+
+### With External Rules Files
+
+This method loads rules from JSON files at runtime:
+
 ```bash
 gcc ccal.c modules/converter.c -o ccal.exe
 ```
 
-To compile without the converter module (basic calculator only):
+**Note:** Without `-DUSE_EMBEDDED_RULES`, you must run ccal from the project directory where `rules/converter/` is accessible.
+
+### Without Converter Module
+
+To compile basic calculator only:
 
 ```bash
 gcc ccal.c -o ccal.exe
@@ -233,41 +259,74 @@ The converter module is integrated directly into the ccal command-line tool. Use
 **Syntax:**
 
 ```bash
+# With explicit rule name
 ccal [/M|-m|--module] <module> <rule> <value> <from_unit> <to_unit>
+
+# With auto-detection (embedded rules only)
+ccal [/M|-m|--module] <module> <value> <from_unit> <to_unit>
 ```
 
 **Examples:**
 
 ```bash
-# Convert 10 inches to centimeters
+# Explicit rule name
 ccal -m converter length 10 in cm
 # Output: 10.000000 in = 25.400000 cm
 
+# Auto-detection (when using embedded rules)
+ccal -m converter 10 in cm
+# Output: 10.000000 in = 25.400000 cm
+
+# Temperature conversion with auto-detection
+ccal -m converter 100 C F
+# Output: 100.000000 C = 212.000000 F
+
 # Convert 5 feet to meters using /M flag
-ccal /M converter length 5 ft m
+ccal /M converter 5 ft m
 # Output: 5.000000 ft = 1.524000 m
 
 # Convert 100 kilometers to miles using --module flag
 ccal --module converter length 100 km mi
-# Output: 100.000000 Km = 62.137100 mi
+# Output: 100.000000 km = 62.137100 mi
 ```
 
 The integrated converter automatically:
 
-- Loads conversion rules from `rules/converter/<rule>.json`
+- Loads conversion rules from embedded data (when compiled with `-DUSE_EMBEDDED_RULES`)
+- Auto-detects the appropriate rule based on units (rule name optional)
 - Performs the conversion calculation
 - Formats and displays the result
 
-### Module Structure
+**Auto-Detection:** When using embedded rules, the rule name is optional. The converter will automatically detect which rule to use based on the units:
+
+```bash
+# These are equivalent:
+ccal -m converter length 10 in cm
+ccal -m converter 10 in cm
+
+# Both work for temperature too:
+ccal -m converter temperature 100 C F
+ccal -m converter 100 C F
+```
+
+### Module Structureall JSON rules in `rules/converter/` are embedded directly into the executable using generated header files. This allows the converter to:
+- Work from any directory without needing access to external JSON files
+- Auto-detect which rule to use based on the units provided
+- Support multiple conversion types (length, temperature, etc.) seamlessly
+
+Use the `build_rules.bat` (Windows) or `build_rules.sh` (macOS/Linux) script to automatically generate headers for all ru
 
 The converter system uses:
 
 - **`modules/`** - Contains converter implementation code
   - `converter.c` - Core conversion engine
   - `converter.h` - Function declarations and structures
+  - `length_rules.h` - Embedded length rules (generated from JSON)
 - **`rules/`** - Contains JSON rule files for different conversion types
   - `converter/length.json` - Length/distance conversion rules
   - Users can add custom rule files following the same format
+
+**Embedded Rules:** When compiled with `-DUSE_EMBEDDED_RULES`, the JSON rules are embedded directly into the executable using generated header files. This allows the converter to work from any directory without needing access to external JSON files.
 
 ### Conversion Rules Format
 
@@ -291,17 +350,42 @@ Conversion rules are defined in JSON files with the following structure:
   - Creates GUI label: `inch(in)`
 - **`to`**: Conversion factors in the same order as the `converter` array
 
-### Compile Converter Module
+# Generate all rule headers automatically
+.\build_rules.bat     # Windows
+./build_rules.sh      # macOS/Linux
 
-The converter is now integrated into ccal. Compile with:
+# Compile with embedded rules
+gcc -DUSE_EMBEDDED_RULES ccal.c modules/converter.c -o ccal.exe
+```
+
+Or compile with external rule files:
 
 ```bash
 gcc ccal.c modules/converter.c -o ccal.exe
 ```
 
+**Adding New Rules:** To add a new conversion type:
+1. Create a JSON file in `rules/converter/` (e.g., `weight.json`)
+2. Run the build script: `.\build_rules.bat` or `./build_rules.sh`
+3. Add the new rule name to the `rule_names[]` array in `auto_detect_rule()` function in [modules/converter.c](modules/converter.c)
+4. Add a correspondin - generate headers first
+.\build_rules.bat
+gcc -DCONVERTER_STANDALONE -DUSE_EMBEDDED_RULES modules/converter.c -o converter.exe
+
+# With external rule files
+gcc -DCONVERTER_STANDALONE modules/converter.c -o converter.exe
+```
+
+**Note:** When adding new rules to standalone converter, update the `rule_names[]` array and switch statement in `auto_detect_rule()` function.
+
 To compile the converter as a standalone tool (for testing):
 
 ```bash
+# With embedded rules
+xxd -i rules/converter/length.json > modules/length_rules.h
+gcc -DCONVERTER_STANDALONE -DUSE_EMBEDDED_RULES modules/converter.c -o converter.exe
+
+# With external rule files
 gcc -DCONVERTER_STANDALONE modules/converter.c -o converter.exe
 ```
 
@@ -319,7 +403,8 @@ Convert a value from one unit to another:
 Convert and display all available units:
 
 ```bash
-> converter 5 ft --all
+
+#### Length> converter 5 ft --all
 > 5.0000 ft =
 >   mm           : 1524.000000
 >   cm           : 152.400000
@@ -342,40 +427,61 @@ The length converter supports the following units with flexible naming:
 - **Inch**: `in`, `inch` → `-in`, `--inch`
 - **Foot**: `ft`, `foot` → `-ft`, `--foot`
 - **Yard**: `yd`, `yard` → `-yd`, `--yard`
+
+#### Temperature
+The temperature converter supports the following units:
+
+- **Celsius**: `C`, `celsius` → `-C`, `--celsius`
+- **Fahrenheit**: `F`, `fahrenheit` → `-F`, `--fahrenheit`
+- **Kelvin**: `K`, `kelvin` → `-K`, `--kelvin`
+
+Temperature conversions use both multiplication factors and offsets to handle the different scales correctly.
 - **Mile**: `mi`, `mile` → `-mi`, `--mile`
 
 All unit names are case-insensitive and support multiple aliases.
 
 ### Creating Custom Conversion Rules
 
-Users can create their own conversion rules by adding JSON files to the `rules/converter/` directory. The format must match the structure shown above:
+Users can create their own conversion rules by adding JSON files to the `rules/converter/` directory. Follow this syntax structure:
 
-1. Define the `converter` array with unit abbreviations
-2. Create conversion entries with:
-   - `name`: Unit names/aliases (comma-separated)
-   - `to`: Conversion factors matching the order in `converter`
-
-Example for creating a temperature converter at `rules/converter/temperature.json`:
+#### Rule File Syntax
 
 ```json
 {
-  "converter": ["C", "F", "K"],
-  "temperature": [
+  "converter": ["unit1", "unit2", "unit3", ...],
+  "rule_name": [
     {
-      "name": "C,celsius",
-      "to": [1, 1.8, 1],
-      "offset": [0, 32, 273.15]
-    },
-    {
-      "name": "F,fahrenheit",
-      "to": [0.55555555556, 1, 0.55555555556],
-      "offset": [-17.77777777778, 0, 255.37222222222]
-    },
-    {
-      "name": "K,kelvin",
-      "to": [1, 1.8, 1],
-      "offset": [-273.15, -459.67, 0]
+      "name": "unit_name,alias1,alias2",
+      "to": [factor_to_unit1, factor_to_unit2, factor_to_unit3, ...],
+      "offset": [offset_for_unit1, offset_for_unit2, offset_for_unit3, ...]
     }
   ]
 }
 ```
+
+**Required Fields:**
+
+- **`"converter"`**: Array of unit abbreviations in the order they appear in conversion arrays
+  - Example: `["mm", "cm", "m", "km"]` for length
+  - These are the short names displayed in output
+
+- **`"rule_name"`**: Array of conversion unit definitions (use the rule file name without `.json`)
+  - Must match your filename: `weight.json` → `"weight": [...]`
+
+- **`"name"`**: Comma-separated aliases for each unit (case-insensitive)
+  - First name is typically the primary identifier
+  - Additional names are alternative ways to reference the same unit
+  - Example: `"in,inch,inches"` allows users to type any of these
+
+- **`"to"`**: Array of conversion factors from this unit to each unit in `converter` array
+  - Length must match `converter` array length
+  - Order must match `converter` array order
+  - Each value converts 1 unit of the current unit to the corresponding target unit
+  - Example: For inches, `[25.4, 2.54, 0.0254]` converts to [mm, cm, m]
+
+**Optional Fields:**
+
+- **`"offset"`**: Array of offset values for conversions (typically used for temperature scales)
+  - Use when conversion requires: `result = (value * factor) + offset`
+  - If omitted, offset defaults to 0 for all conversions
+  - Example: Temperature conversions like Celsius to Fahrenheit need both factor and offset

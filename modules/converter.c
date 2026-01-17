@@ -14,6 +14,11 @@
 #include <dirent.h>
 #endif
 
+// Include embedded rule data
+#ifdef USE_EMBEDDED_RULES
+#include "rules.h"  // Master header that includes all rule files
+#endif
+
 // Maximum sizes for parsing JSON conversion rules
 #define MAX_UNITS 32
 #define MAX_NAME_LEN 64
@@ -253,6 +258,94 @@ int load_conversion_rules(const char* filepath, ConversionRules* rules) {
     return rules->unit_count > 0;
 }
 
+// Load conversion rules from embedded data (compiled-in JSON)
+#ifdef USE_EMBEDDED_RULES
+int load_embedded_conversion_rules(const char* rule_name, ConversionRules* rules) {
+    unsigned char* json_data = NULL;
+    unsigned int json_len = 0;
+    
+    // Match rule name to embedded data
+    if (strcasecmp(rule_name, "length") == 0) {
+        json_data = rules_converter_length_json;
+        json_len = rules_converter_length_json_len;
+    } else if (strcasecmp(rule_name, "temperature") == 0) {
+        json_data = rules_converter_temperature_json;
+        json_len = rules_converter_temperature_json_len;
+    } else {
+        fprintf(stderr, "Error: Unknown embedded rule: %s\n", rule_name);
+        return 0;
+    }
+    
+    // Parse the embedded JSON data line by line
+    rules->converter_count = 0;
+    rules->unit_count = 0;
+    
+    char line[MAX_LINE_LEN];
+    int in_unit_object = 0;
+    int current_unit_has_offset = 0;
+    unsigned int pos = 0;
+    
+    while (pos < json_len) {
+        // Read one line from the embedded data
+        int line_idx = 0;
+        while (pos < json_len && json_data[pos] != '\n' && line_idx < MAX_LINE_LEN - 1) {
+            line[line_idx++] = json_data[pos++];
+        }
+        line[line_idx] = '\0';
+        if (pos < json_len && json_data[pos] == '\n') pos++;  // Skip newline
+        
+        trim_whitespace(line);
+        
+        // Parse converter array
+        if (strstr(line, "\"converter\"") && rules->converter_count == 0) {
+            parse_converter_array(line, rules);
+        }
+        // Detect start of unit object
+        else if (strstr(line, "\"name\"")) {
+            in_unit_object = 1;
+            current_unit_has_offset = 0;
+            if (rules->unit_count < MAX_UNITS) {
+                parse_unit_name(line, rules->units[rules->unit_count].names);
+                rules->units[rules->unit_count].has_offset = 0;
+                // Initialize offset array to zeros
+                for (int i = 0; i < MAX_UNITS; i++) {
+                    rules->units[rules->unit_count].offset[i] = 0.0;
+                }
+            }
+        }
+        // Parse conversion factors
+        else if (in_unit_object && strstr(line, "\"to\"")) {
+            if (rules->unit_count < MAX_UNITS) {
+                parse_unit_to_array(line, 
+                                   rules->units[rules->unit_count].to,
+                                   &rules->units[rules->unit_count].to_count);
+            }
+        }
+        // Parse offset values (optional)
+        else if (in_unit_object && strstr(line, "\"offset\"")) {
+            if (rules->unit_count < MAX_UNITS) {
+                int offset_count;
+                if (parse_unit_offset_array(line, 
+                                           rules->units[rules->unit_count].offset,
+                                           &offset_count)) {
+                    rules->units[rules->unit_count].has_offset = 1;
+                    current_unit_has_offset = 1;
+                }
+            }
+        }
+        // Detect end of unit object (closing brace)
+        else if (in_unit_object && strchr(line, '}')) {
+            if (rules->units[rules->unit_count].to_count > 0) {
+                rules->unit_count++;
+            }
+            in_unit_object = 0;
+        }
+    }
+    
+    return rules->unit_count > 0;
+}
+#endif
+
 // Find a unit by name (case-insensitive, checks all aliases)
 int find_unit_by_name(const ConversionRules* rules, const char* name) {
     for (int i = 0; i < rules->unit_count; i++) {
@@ -273,6 +366,38 @@ int find_unit_by_name(const ConversionRules* rules, const char* name) {
     }
     return -1;
 }
+
+// Auto-detect which rule to use based on unit names
+#ifdef USE_EMBEDDED_RULES
+const char* auto_detect_rule(const char* from_unit, const char* to_unit) {
+    // List of available embedded rules
+    const char* rule_names[] = {"length", "temperature"};
+    const int num_rules = 2;
+    
+    // Try each rule to see if it contains the units
+    for (int r = 0; r < num_rules; r++) {
+        ConversionRules test_rules;
+        if (load_embedded_conversion_rules(rule_names[r], &test_rules)) {
+            int from_found = (find_unit_by_name(&test_rules, from_unit) >= 0);
+            int to_found = 0;
+            
+            // Check if to_unit is in converter array
+            for (int i = 0; i < test_rules.converter_count; i++) {
+                if (strcasecmp(test_rules.converter_units[i], to_unit) == 0) {
+                    to_found = 1;
+                    break;
+                }
+            }
+            
+            if (from_found && to_found) {
+                return rule_names[r];
+            }
+        }
+    }
+    
+    return NULL;  // No matching rule found;
+}
+#endif
 
 // Convert a value from one unit to another
 double convert_unit(const ConversionRules* rules, double value, 
@@ -469,6 +594,15 @@ int main(int argc, char* argv[]) {
     }
     
     ConversionRules rules;
+    #ifdef USE_EMBEDDED_RULES
+    // Use embedded rules
+    if (!load_embedded_conversion_rules(single_rule, &rules)) {
+        fprintf(stderr, "Failed to load embedded conversion rules\n");
+        fprintf(stderr, "Available embedded rules: length\n");
+        return 1;
+    }
+    #else
+    // Load from file
     if (!load_conversion_rules(filepath, &rules)) {
         fprintf(stderr, "Failed to load conversion rules from: %s\n", filepath);
         if (rule_count > 1) {
@@ -476,6 +610,7 @@ int main(int argc, char* argv[]) {
         }
         return 1;
     }
+    #endif
     
     double value = atof(argv[arg_offset]);
     const char* from_unit = argv[arg_offset + 1];

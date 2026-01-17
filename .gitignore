@@ -6,3 +6,5 @@ ccal_gui.aps
 .github/ 
 tests/ccal_test.exe
 *.exe 
+modules/rules.h 
+modules/*rules.h 
