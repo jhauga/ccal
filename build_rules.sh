@@ -6,9 +6,9 @@ echo "Generating embedded rule headers..."
 
 # Process each JSON file in rules/converter/
 for jsonfile in rules/converter/*.json; do
-    basename=$(basename "$jsonfile" .json)
-    echo "Processing ${basename}.json..."
-    xxd -i "$jsonfile" "modules/${basename}_rules.h"
+ basename=$(basename "$jsonfile" .json)
+ echo "Processing ${basename}.json..."
+ xxd -i "$jsonfile" "modules/${basename}_rules.h"
 done
 
 # Create master rules.h that includes all rule headers
@@ -24,8 +24,8 @@ cat > modules/rules.h << 'EOF'
 EOF
 
 for jsonfile in rules/converter/*.json; do
-    basename=$(basename "$jsonfile" .json)
-    echo "#include \"${basename}_rules.h\"" >> modules/rules.h
+ basename=$(basename "$jsonfile" .json)
+ echo "#include \"${basename}_rules.h\"" >> modules/rules.h
 done
 
 cat >> modules/rules.h << 'EOF'
