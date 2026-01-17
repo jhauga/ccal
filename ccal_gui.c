@@ -44,6 +44,9 @@ typedef struct {
 HistoryEntry gHistory[MAX_HISTORY];
 int gHistoryCount = 0;
 int gHistoryHoverIndex = -1;
+int gHistoryResizingColumn = -1;  // which column divider is being resized (-1 = none)
+int gHistoryColumnWidths[HISTORY_COLUMNS];  // width of each column
+int gResizeDividerWidth = 6;  // width of the resize divider area
 
 HWND hwnd, hInput, hOutput, hHistory;  // handles to input, output, and history controls
 HWND hClearHistBtn;  // handle to clear history button for custom font
@@ -78,6 +81,14 @@ static void DrawHistory(HDC hdc, RECT* rect);
 static int GetHistoryItemAtPoint(int x, int y, RECT* clientRect);
 static void UpdateHistoryVisibility(int width);
 void FocusOnInput();
+
+// Helper function to calculate column positions
+static void CalculateColumnPositions(int panelWidth, int positions[HISTORY_COLUMNS + 1]) {
+    positions[0] = 0;
+    for (int i = 0; i < HISTORY_COLUMNS; i++) {
+        positions[i + 1] = positions[i] + gHistoryColumnWidths[i];
+    }
+}
 
 // SUPPORT FUNCTIONS:
 //////////////////////////////////////////////////////////////////////////////
@@ -446,8 +457,22 @@ static void AddToHistory(const char* equation) {
 
 // Get history item index at mouse position
 static int GetHistoryItemAtPoint(int x, int y, RECT* clientRect) {
-    int colWidth = clientRect->right / HISTORY_COLUMNS;
-    int col = x / colWidth;
+    // Calculate column positions using helper
+    int colPositions[HISTORY_COLUMNS + 1];
+    CalculateColumnPositions(clientRect->right, colPositions);
+    
+    // Find which column
+    int col = -1;
+    for (int i = 0; i < HISTORY_COLUMNS; i++) {
+        if (x >= colPositions[i] && x < colPositions[i + 1]) {
+            col = i;
+            break;
+        }
+    }
+    
+    if (col == -1)
+        return -1;
+    
     int row = y / HISTORY_ITEM_HEIGHT;
     
     int availableHeight = clientRect->bottom - clientRect->top;
@@ -475,15 +500,28 @@ static void DrawHistory(HDC hdc, RECT* rect) {
     FillRect(hdc, rect, bgBrush);
     DeleteObject(bgBrush);
     
+    // Initialize or reset column widths when panel width changes
+    static int lastPanelWidth = 0;
+    if (lastPanelWidth != rect->right || gHistoryColumnWidths[0] == 0) {
+        int defaultWidth = rect->right / HISTORY_COLUMNS;
+        for (int i = 0; i < HISTORY_COLUMNS; i++) {
+            gHistoryColumnWidths[i] = defaultWidth;
+        }
+        lastPanelWidth = rect->right;
+    }
+    
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, RGB(0, 0, 0));
     
-    int colWidth = rect->right / HISTORY_COLUMNS;
     int availableHeight = rect->bottom - rect->top;
     int rowsPerCol = (availableHeight - 10) / HISTORY_ITEM_HEIGHT;  // Dynamic row calculation
     
     if (rowsPerCol < 1)
         rowsPerCol = 1;
+    
+    // Calculate column positions using helper
+    int colPositions[HISTORY_COLUMNS + 1];
+    CalculateColumnPositions(rect->right, colPositions);
     
     // Draw items from newest to oldest, left to right, top to bottom
     for (int i = 0; i < gHistoryCount; i++) {
@@ -495,9 +533,9 @@ static void DrawHistory(HDC hdc, RECT* rect) {
             break;
         
         RECT itemRect;
-        itemRect.left = col * colWidth + 5;
+        itemRect.left = colPositions[col] + 5;
         itemRect.top = row * HISTORY_ITEM_HEIGHT + 5;
-        itemRect.right = (col + 1) * colWidth - 5;
+        itemRect.right = colPositions[col + 1] - 5;
         itemRect.bottom = (row + 1) * HISTORY_ITEM_HEIGHT - 2;
         
         // Highlight on hover
@@ -515,6 +553,17 @@ static void DrawHistory(HDC hdc, RECT* rect) {
         
         DrawText(hdc, gHistory[itemIndex].equation, -1, &itemRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     }
+    
+    // Draw column dividers
+    HPEN dividerPen = CreatePen(PS_SOLID, 1, RGB(47, 79, 79));  // darkslategray
+    HPEN oldPen = (HPEN)SelectObject(hdc, dividerPen);
+    for (int i = 1; i < HISTORY_COLUMNS; i++) {
+        int x = colPositions[i];
+        MoveToEx(hdc, x, 0, NULL);
+        LineTo(hdc, x, rect->bottom);
+    }
+    SelectObject(hdc, oldPen);
+    DeleteObject(dividerPen);
 }
 
 // Update history panel visibility based on window width
@@ -536,20 +585,76 @@ LRESULT CALLBACK HistoryProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             HDC hdc = BeginPaint(hWnd, &ps);
             RECT rect;
             GetClientRect(hWnd, &rect);
-            DrawHistory(hdc, &rect);
+            
+            // Double buffering to eliminate flicker
+            HDC memDC = CreateCompatibleDC(hdc);
+            HBITMAP memBitmap = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
+            HBITMAP oldBitmap = (HBITMAP)SelectObject(memDC, memBitmap);
+            
+            // Draw to memory DC
+            DrawHistory(memDC, &rect);
+            
+            // Copy to screen
+            BitBlt(hdc, 0, 0, rect.right, rect.bottom, memDC, 0, 0, SRCCOPY);
+            
+            // Cleanup
+            SelectObject(memDC, oldBitmap);
+            DeleteObject(memBitmap);
+            DeleteDC(memDC);
+            
             EndPaint(hWnd, &ps);
             return 0;
+        }
+        case WM_ERASEBKGND: {
+            // Don't erase background - we paint the entire area in WM_PAINT
+            return 1;
         }
         case WM_MOUSEMOVE: {
             RECT rect;
             GetClientRect(hWnd, &rect);
             int x = LOWORD(lParam);
             int y = HIWORD(lParam);
-            int newHoverIndex = GetHistoryItemAtPoint(x, y, &rect);
             
-            if (newHoverIndex != gHistoryHoverIndex) {
-                gHistoryHoverIndex = newHoverIndex;
+            // Handle active column resizing
+            if (gHistoryResizingColumn >= 0 && gHistoryResizingColumn < HISTORY_COLUMNS) {
+                // Calculate column positions using helper
+                int colPositions[HISTORY_COLUMNS + 1];
+                CalculateColumnPositions(rect.right, colPositions);
+                
+                // Calculate new width for the column being resized
+                int newWidth = x - colPositions[gHistoryResizingColumn];
+                if (newWidth < 50) newWidth = 50;  // minimum column width
+                if (newWidth > 400) newWidth = 400;  // maximum column width
+                
+                gHistoryColumnWidths[gHistoryResizingColumn] = newWidth;
                 InvalidateRect(hWnd, NULL, TRUE);
+                return 0;
+            }
+            
+            // Calculate column positions for hover detection using helper
+            int colPositions[HISTORY_COLUMNS + 1];
+            CalculateColumnPositions(rect.right, colPositions);
+            
+            // Check if over a column divider
+            int overDivider = -1;
+            for (int i = 1; i < HISTORY_COLUMNS; i++) {
+                int dividerX = colPositions[i];
+                if (x >= dividerX - gResizeDividerWidth / 2 && x <= dividerX + gResizeDividerWidth / 2) {
+                    overDivider = i - 1;  // resizing the column to the left of the divider
+                    break;
+                }
+            }
+            
+            if (overDivider >= 0) {
+                SetCursor(LoadCursor(NULL, IDC_SIZEWE));
+            } else {
+                SetCursor(LoadCursor(NULL, IDC_ARROW));
+                int newHoverIndex = GetHistoryItemAtPoint(x, y, &rect);
+                
+                if (newHoverIndex != gHistoryHoverIndex) {
+                    gHistoryHoverIndex = newHoverIndex;
+                    InvalidateRect(hWnd, NULL, TRUE);
+                }
             }
             
             // Track mouse leave to clear hover state when mouse exits window
@@ -573,6 +678,21 @@ LRESULT CALLBACK HistoryProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             GetClientRect(hWnd, &rect);
             int x = LOWORD(lParam);
             int y = HIWORD(lParam);
+            
+            // Calculate column positions using helper
+            int colPositions[HISTORY_COLUMNS + 1];
+            CalculateColumnPositions(rect.right, colPositions);
+            
+            // Check if clicking on a column divider
+            for (int i = 1; i < HISTORY_COLUMNS; i++) {
+                int dividerX = colPositions[i];
+                if (x >= dividerX - gResizeDividerWidth / 2 && x <= dividerX + gResizeDividerWidth / 2) {
+                    gHistoryResizingColumn = i - 1;  // resize the column to the left
+                    SetCapture(hWnd);
+                    return 0;
+                }
+            }
+            
             int clickedIndex = GetHistoryItemAtPoint(x, y, &rect);
             
             if (clickedIndex >= 0 && clickedIndex < gHistoryCount) {
@@ -591,6 +711,35 @@ LRESULT CALLBACK HistoryProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
                 FocusOnInput();
             }
             return 0;
+        }
+        case WM_LBUTTONUP: {
+            if (gHistoryResizingColumn >= 0 && gHistoryResizingColumn < HISTORY_COLUMNS) {
+                gHistoryResizingColumn = -1;
+                ReleaseCapture();
+                return 0;
+            }
+            break;
+        }
+        case WM_SETCURSOR: {
+            RECT rect;
+            GetClientRect(hWnd, &rect);
+            POINT pt;
+            GetCursorPos(&pt);
+            ScreenToClient(hWnd, &pt);
+            
+            // Calculate column positions using helper
+            int colPositions[HISTORY_COLUMNS + 1];
+            CalculateColumnPositions(rect.right, colPositions);
+            
+            // Check if over a column divider
+            for (int i = 1; i < HISTORY_COLUMNS; i++) {
+                int dividerX = colPositions[i];
+                if (pt.x >= dividerX - gResizeDividerWidth / 2 && pt.x <= dividerX + gResizeDividerWidth / 2) {
+                    SetCursor(LoadCursor(NULL, IDC_SIZEWE));
+                    return TRUE;
+                }
+            }
+            break;
         }
     }
     return DefWindowProc(hWnd, msg, wParam, lParam);
@@ -1161,14 +1310,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 int availableWidth = width - (2 * margin);
                 
                 if (width >= HISTORY_MIN_WIDTH && hHistory) {
-                    // Show history panel on the right
+                    // Show history panel on the right - use available space
                     int historyWidth = width - calcWidth - (3 * margin);
-                    if (historyWidth > HISTORY_WIDTH)
-                        historyWidth = HISTORY_WIDTH;
+                    int historyX = calcWidth + (2 * margin);
                     
                     MoveWindow(hInput, margin, 10, calcWidth, 25, TRUE);
                     MoveWindow(hOutput, margin, 40, calcWidth, 25, TRUE);
-                    MoveWindow(hHistory, calcWidth + (2 * margin), 10, historyWidth, height - 20, TRUE);
+                    MoveWindow(hHistory, historyX, 10, historyWidth, height - 20, TRUE);
                 } else {
                     // No history panel, use available width for input/output
                     if (availableWidth < calcWidth)
