@@ -10,6 +10,12 @@
 #include <ctype.h>
 #include "remove_format.h"
 #include "help.h"
+
+// Include converter module when not building GUI
+#ifndef BUILDING_GUI
+#include "modules/converter.h"
+#endif
+
 // Note 2 The headers above mix standard C libraries for core facilities with project headers; recognizing which features stem from libc helps when porting this parser to constrained environments.
 
 // GLOBAL ELEMENTS:
@@ -569,6 +575,57 @@ int main(int argc, char* argv[]) {
         return 0;
     }
     // Note 39 The CLI mirrors Unix conventions: no arguments or --help prints documentation, making the tool friendly for shell usage and automated scripts.
+
+    // Check for module flag: /M, -m, or --module
+    if ((strcmp(argv[1], "/M") == 0 || strcmp(argv[1], "-m") == 0 || strcmp(argv[1], "--module") == 0)) {
+        if (argc < 7) {
+            fprintf(stderr, "Usage: ccal [/M|-m|--module] <module> <rule> <value> <from_unit> <to_unit>\n");
+            fprintf(stderr, "Example: ccal -m converter length 10 in cm\n");
+            return 1;
+        }
+        
+        const char* module_name = argv[2];
+        const char* rule_name = argv[3];
+        double value = atof(argv[4]);
+        const char* from_unit = argv[5];
+        const char* to_unit = argv[6];
+        
+        // Only converter module is currently supported
+        if (strcmp(module_name, "converter") != 0) {
+            fprintf(stderr, "Error: Unknown module '%s'\n", module_name);
+            fprintf(stderr, "Available modules: converter\n");
+            return 1;
+        }
+        
+        // Build the path to the rule file
+        char rule_path[256];
+        snprintf(rule_path, sizeof(rule_path), "rules/converter/%s.json", rule_name);
+        
+        // Load conversion rules
+        ConversionRules rules;
+        if (!load_conversion_rules(rule_path, &rules)) {
+            fprintf(stderr, "Error: Failed to load conversion rules from '%s'\n", rule_path);
+            fprintf(stderr, "Make sure the rule file exists in the rules/converter/ directory\n");
+            return 1;
+        }
+        
+        // Perform conversion
+        double result = convert_unit(&rules, value, from_unit, to_unit);
+        
+        // Get short names for display
+        char from_short[32];
+        int from_idx = find_unit_by_name(&rules, from_unit);
+        if (from_idx >= 0) {
+            get_unit_short_name(&rules, from_idx, from_short);
+        } else {
+            strcpy(from_short, from_unit);
+        }
+        
+        // Display result
+        printf("%.6f %s = %.6f %s\n", value, from_short, result, to_unit);
+        
+        return 0;
+    }
 
     int error;
     int fatalError = 0;

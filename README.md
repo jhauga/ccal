@@ -1,8 +1,8 @@
 # ccal ![repo icon](assets/icon.png)
 
-A flexible calculator that ships with a Windows GUI front end and a cross-platform CLI. Both layers share the same C parser so complex expressions behave identically.
+A flexible calculator that ships with a Windows GUI front end and a cross-platform CLI. Both layers share the same C parser so complex expressions behave identically. The calculator now includes a modular converter system for unit conversions that can be used with the command-line engine.
 
-## Requirements:
+## Requirements
 
 All platforms require the GNU compiler `gcc`.
 
@@ -59,7 +59,13 @@ Follow the installer prompts until you reach **Select Packages**.
 
 ## Compile Command Line Tool
 
-The CLI builds on macOS, Linux, and Windows. Compile the core engine:
+The CLI builds on macOS, Linux, and Windows. To compile with the converter module:
+
+```bash
+gcc ccal.c modules/converter.c -o ccal.exe
+```
+
+To compile without the converter module (basic calculator only):
 
 ```bash
 gcc ccal.c -o ccal.exe
@@ -73,7 +79,7 @@ xxd -i help.txt > help.h
 
 This embeds the latest help text in the executable.
 
-## Compile GUI:
+## Compile GUI
 
 ### Clone the repository
 
@@ -113,8 +119,6 @@ gcc -DBUILDING_GUI ccal_gui.c ccal.c ccal_gui.res -o ccal_gui.exe -mwindows
 3. Press `Enter` or click `=` to evaluate.
 4. Press `d` to clear the current expression and result.
 5. Use `Ctrl + C` to copy the result to the clipboard.
-
-Comma formatting is applied automatically while you type, and backspace/delete skip over commas so numbers stay nicely grouped.
 
 ## Command Line Usage
 
@@ -216,4 +220,162 @@ To calculate exponentiation, use `p` as the operator. With `-q/--quote`, you can
 
 > ccal --quote "2^2"
 > 4
+```
+
+## Unit Conversion Module
+
+The ccal calculator includes a modular converter system for unit conversions. The converter is extensible and rule-based, allowing users to create custom conversion rules.
+
+### Integrated Usage
+
+The converter module is integrated directly into the ccal command-line tool. Use the module flag to perform conversions:
+
+**Syntax:**
+
+```bash
+ccal [/M|-m|--module] <module> <rule> <value> <from_unit> <to_unit>
+```
+
+**Examples:**
+
+```bash
+# Convert 10 inches to centimeters
+ccal -m converter length 10 in cm
+# Output: 10.000000 in = 25.400000 cm
+
+# Convert 5 feet to meters using /M flag
+ccal /M converter length 5 ft m
+# Output: 5.000000 ft = 1.524000 m
+
+# Convert 100 kilometers to miles using --module flag
+ccal --module converter length 100 km mi
+# Output: 100.000000 Km = 62.137100 mi
+```
+
+The integrated converter automatically:
+
+- Loads conversion rules from `rules/converter/<rule>.json`
+- Performs the conversion calculation
+- Formats and displays the result
+
+### Module Structure
+
+The converter system uses:
+
+- **`modules/`** - Contains converter implementation code
+  - `converter.c` - Core conversion engine
+  - `converter.h` - Function declarations and structures
+- **`rules/`** - Contains JSON rule files for different conversion types
+  - `converter/length.json` - Length/distance conversion rules
+  - Users can add custom rule files following the same format
+
+### Conversion Rules Format
+
+Conversion rules are defined in JSON files with the following structure:
+
+```json
+{
+  "converter": ["mm", "cm", "m", "km", "in", "ft", "yd", "mi"],
+  "length": [
+    {
+      "name": "in,inch",
+      "to": [25.4, 2.54, 0.0254, 0.0000254, 1, 0.0833, 0.0278, 0.0000158]
+    }
+  ]
+}
+```
+
+- **`converter`**: Array of unit abbreviations in order
+- **`name`**: Comma-separated unit names/aliases (case-insensitive)
+  - Creates CLI flags: `-in`, `--inch`
+  - Creates GUI label: `inch(in)`
+- **`to`**: Conversion factors in the same order as the `converter` array
+
+### Compile Converter Module
+
+The converter is now integrated into ccal. Compile with:
+
+```bash
+gcc ccal.c modules/converter.c -o ccal.exe
+```
+
+To compile the converter as a standalone tool (for testing):
+
+```bash
+gcc -DCONVERTER_STANDALONE modules/converter.c -o converter.exe
+```
+
+### Standalone Converter Usage
+
+If you compiled the standalone converter tool, you can use it separately:
+
+Convert a value from one unit to another:
+
+```bash
+> converter 10 inch cm
+> 10.0000 in = 25.400000 cm
+```
+
+Convert and display all available units:
+
+```bash
+> converter 5 ft --all
+> 5.0000 ft =
+>   mm           : 1524.000000
+>   cm           : 152.400000
+>   m            : 1.524000
+>   km           : 0.001524
+>   in           : 60.000000
+>   ft           : 5.000000
+>   yd           : 1.665000
+>   mi           : 0.000945
+```
+
+### Supported Units (Length)
+
+The length converter supports the following units with flexible naming:
+
+- **Millimeter**: `mm`, `millimeter` → `-mm`, `--millimeter`
+- **Centimeter**: `cm`, `centimeter` → `-cm`, `--centimeter`
+- **Meter**: `m`, `meter` → `-m`, `--meter`
+- **Kilometer**: `km`, `kilometer` → `-km`, `--kilometer`
+- **Inch**: `in`, `inch` → `-in`, `--inch`
+- **Foot**: `ft`, `foot` → `-ft`, `--foot`
+- **Yard**: `yd`, `yard` → `-yd`, `--yard`
+- **Mile**: `mi`, `mile` → `-mi`, `--mile`
+
+All unit names are case-insensitive and support multiple aliases.
+
+### Creating Custom Conversion Rules
+
+Users can create their own conversion rules by adding JSON files to the `rules/converter/` directory. The format must match the structure shown above:
+
+1. Define the `converter` array with unit abbreviations
+2. Create conversion entries with:
+   - `name`: Unit names/aliases (comma-separated)
+   - `to`: Conversion factors matching the order in `converter`
+
+Example for creating a temperature converter at `rules/converter/temperature.json`:
+
+```json
+{
+  "converter": ["C", "F", "K"],
+  "temperature": [
+    {
+      "name": "C,celsius",
+      "to": [1, 1.8, 1],
+      "offset": [0, 32, 273.15]
+    },
+    {
+      "name": "F,fahrenheit",
+      "to": [0.55555555556, 1, 0.55555555556],
+      "offset": [-17.77777777778, 0, 255.37222222222]
+    },
+    {
+      "name": "K,kelvin",
+      "to": [1, 1.8, 1],
+      "offset": [-273.15, -459.67, 0]
+    }
+  ]
+}
 ```

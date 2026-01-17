@@ -5,3 +5,4 @@ ccal_gui.exe
 ccal_gui.aps 
 .github/ 
 tests/ccal_test.exe
+*.exe 
