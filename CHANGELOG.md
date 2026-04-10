@@ -5,7 +5,21 @@ All notable changes to the ccal calculator project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - Current Release
+## [2.0.1] - Current Release
+
+### Added
+
+- `copyResults()` - Wrapped clipboard ops in `if (OpenClipboard(hwnd))`, added `GlobalFree(hMem)` on failure
+- Message loop - Added app-local Ctrl+C pre-dispatch intercept — fires only for this app's own message queue, never touches other processes
+
+### Removed 
+
+- `WM_HOTKEY` case -	Removed entirely (inline duplicate clipboard code, same OpenClipboard bug)
+- `WM_SETFOCUS` -	Removed `RegisterHotKey` call
+- `WM_ACTIVATE` -	Removed entirely (only contained hotkey register/unregister)
+- `WM_DESTROY` -	Removed `UnregisterHotKey` (nothing to unregister)
+
+## [2.0.0]
 
 ### Added
 
