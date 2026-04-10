@@ -788,12 +788,19 @@ void copyResults() {
             // copy that survives after this function returns.
             memcpy(GlobalLock(hMem), val, len);
             GlobalUnlock(hMem);
-            OpenClipboard(hwnd);
-            EmptyClipboard();
-            SetClipboardData(CF_TEXT, hMem);
-            // Once ownership is transferred, Windows will free the memory when
-            // another clipboard operation replaces it.
-            CloseClipboard();
+            // Only proceed if we can actually open the clipboard; another
+            // process may hold it momentarily (e.g. clipboard managers).
+            if (OpenClipboard(hwnd)) {
+                EmptyClipboard();
+                // Once ownership is transferred, Windows will free the memory
+                // when another clipboard operation replaces it.
+                SetClipboardData(CF_TEXT, hMem);
+                CloseClipboard();
+            } else {
+                // We allocated hMem but never handed it to Windows, so we
+                // must free it ourselves to avoid a memory leak.
+                GlobalFree(hMem);
+            }
         }
     }
 }
@@ -1234,53 +1241,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             break;
         }
-        // ensure ctrl + c gets equated results
-        case WM_HOTKEY: {
-            if (wParam == 1) {
-                // same clipboard copy logic
-                char val[255];
-                GetWindowText(hOutput, val, sizeof(val));
-                if (val[0] != '\0' && strcmp(val, "Error") != 0) {
-                    const size_t len = strlen(val) + 1;
-                    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, len);
-                    if (hMem) {
-                        // Hotkeys deliver their own notifications even if the
-                        // focus changes, so we duplicate the clipboard code to
-                        // support global Ctrl+C behavior.
-                        memcpy(GlobalLock(hMem), val, len);
-                        GlobalUnlock(hMem);
-                        OpenClipboard(hwnd);
-                        EmptyClipboard();
-                        SetClipboardData(CF_TEXT, hMem);
-                        CloseClipboard();
-                    }
-                }
-                return 0;
-            }
-            break;
-        }
-        // allow ctrl + c when prompt focus
+        // allow ctrl + c when prompt focus — handled in the message loop so
+        // child controls (hInput/hOutput) are covered without a global hotkey
         case WM_SETFOCUS: {
-            // Registering the hotkey on focus ensures the accelerator belongs
-            // to our window only while it is active, matching user intent.
-            RegisterHotKey(hwnd, 1, MOD_CONTROL, 'C');
-            break;
-        }
-        // allow ctrl + c when other program focus
-        case WM_ACTIVATE: {
-            if (LOWORD(wParam) == WA_ACTIVE || LOWORD(wParam) == WA_CLICKACTIVE) {
-                // Window is active — register hotkey
-                RegisterHotKey(hwnd, 1, MOD_CONTROL, 'C');
-            } else if (LOWORD(wParam) == WA_INACTIVE) {
-                // Window is not active — unregister hotkey
-                UnregisterHotKey(hwnd, 1);
-            }
-            else {
-                // focus on input when window is active
-                // For partial activation states we still restore the caret to
-                // give users instant access to typing after system prompts.
-                FocusOnInput();
-            }
             break;
         }
         // set minimum window size
@@ -1409,10 +1372,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
         // exit gui on error
         case WM_DESTROY: {
-            // Always unregister hotkeys you registered, otherwise Windows will
-            // keep them bound and the next instance will fail to claim them.
-            UnregisterHotKey(hwnd, 1);
-            
             // Clean up font resource
             if (hSmallFont) {
                 DeleteObject(hSmallFont);
@@ -1488,6 +1447,19 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdSh
     // message loop
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
+        // Intercept Ctrl+C before dispatching to any child control so that
+        // pressing Ctrl+C always copies the result regardless of which control
+        // currently has keyboard focus.  This replaces the old RegisterHotKey
+        // approach, which was a system-wide grab that blocked copy/paste in
+        // other applications whenever WM_ACTIVATE(WA_INACTIVE) was missed.
+        if (msg.message == WM_KEYDOWN && msg.wParam == 'C' &&
+                (GetKeyState(VK_CONTROL) & 0x8000)) {
+            copyResults();
+            // Consume the message so the focused edit control does not also
+            // process it (which would overwrite the clipboard with its own
+            // selection rather than the computed result).
+            continue;
+        }
         // TranslateMessage turns virtual-key presses into WM_CHAR, which our
         // input subclass relies on for formatting.
         TranslateMessage(&msg);
