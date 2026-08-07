@@ -492,7 +492,7 @@ static int GetHistoryItemAtPoint(int x, int y, RECT* clientRect) {
     // Calculate column positions using helper
     int colPositions[HISTORY_COLUMNS + 1];
     CalculateColumnPositions(clientRect->right, colPositions);
-    
+
     // Find which column
     int col = -1;
     for (int i = 0; i < HISTORY_COLUMNS; i++) {
@@ -501,27 +501,27 @@ static int GetHistoryItemAtPoint(int x, int y, RECT* clientRect) {
             break;
         }
     }
-    
+
     if (col == -1)
         return -1;
-    
+
     int row = y / HISTORY_ITEM_HEIGHT;
-    
+
     int availableHeight = clientRect->bottom - clientRect->top;
     int rowsPerCol = (availableHeight - 10) / HISTORY_ITEM_HEIGHT;  // Dynamic row calculation
-    
+
     if (rowsPerCol < 1)
         rowsPerCol = 1;
-    
+
     if (col >= HISTORY_COLUMNS || row >= rowsPerCol)
         return -1;
-    
+
     // Items are displayed from newest (top-left) going down, then to next column
     int index = gHistoryCount - 1 - (col * rowsPerCol + row);
-    
+
     if (index >= 0 && index < gHistoryCount)
         return index;
-    
+
     return -1;
 }
 
@@ -531,7 +531,7 @@ static void DrawHistory(HDC hdc, RECT* rect) {
     HBRUSH bgBrush = CreateSolidBrush(PAL_PANEL);
     FillRect(hdc, rect, bgBrush);
     DeleteObject(bgBrush);
-    
+
     // Initialize or reset column widths when panel width changes
     static int lastPanelWidth = 0;
     if (lastPanelWidth != rect->right || gHistoryColumnWidths[0] == 0) {
@@ -541,35 +541,35 @@ static void DrawHistory(HDC hdc, RECT* rect) {
         }
         lastPanelWidth = rect->right;
     }
-    
+
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, PAL_TEXT);
-    
+
     int availableHeight = rect->bottom - rect->top;
     int rowsPerCol = (availableHeight - 10) / HISTORY_ITEM_HEIGHT;  // Dynamic row calculation
-    
+
     if (rowsPerCol < 1)
         rowsPerCol = 1;
-    
+
     // Calculate column positions using helper
     int colPositions[HISTORY_COLUMNS + 1];
     CalculateColumnPositions(rect->right, colPositions);
-    
+
     // Draw items from newest to oldest, left to right, top to bottom
     for (int i = 0; i < gHistoryCount; i++) {
         int itemIndex = gHistoryCount - 1 - i;
         int col = i / rowsPerCol;
         int row = i % rowsPerCol;
-        
+
         if (col >= HISTORY_COLUMNS)
             break;
-        
+
         RECT itemRect;
         itemRect.left = colPositions[col] + 5;
         itemRect.top = row * HISTORY_ITEM_HEIGHT + 5;
         itemRect.right = colPositions[col + 1] - 5;
         itemRect.bottom = (row + 1) * HISTORY_ITEM_HEIGHT - 2;
-        
+
         // Highlight on hover
         if (itemIndex == gHistoryHoverIndex) {
             HBRUSH hoverBrush = CreateSolidBrush(PAL_HOVER);
@@ -582,10 +582,10 @@ static void DrawHistory(HDC hdc, RECT* rect) {
             SelectObject(hdc, oldPen);
             DeleteObject(borderPen);
         }
-        
+
         DrawText(hdc, gHistory[itemIndex].equation, -1, &itemRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     }
-    
+
     // Draw column dividers
     HPEN dividerPen = CreatePen(PS_SOLID, 1, PAL_DIVIDER);  // deep storm gray
     HPEN oldPen = (HPEN)SelectObject(hdc, dividerPen);
@@ -617,23 +617,23 @@ LRESULT CALLBACK HistoryProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             HDC hdc = BeginPaint(hWnd, &ps);
             RECT rect;
             GetClientRect(hWnd, &rect);
-            
+
             // Double buffering to eliminate flicker
             HDC memDC = CreateCompatibleDC(hdc);
             HBITMAP memBitmap = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
             HBITMAP oldBitmap = (HBITMAP)SelectObject(memDC, memBitmap);
-            
+
             // Draw to memory DC
             DrawHistory(memDC, &rect);
-            
+
             // Copy to screen
             BitBlt(hdc, 0, 0, rect.right, rect.bottom, memDC, 0, 0, SRCCOPY);
-            
+
             // Cleanup
             SelectObject(memDC, oldBitmap);
             DeleteObject(memBitmap);
             DeleteDC(memDC);
-            
+
             EndPaint(hWnd, &ps);
             return 0;
         }
@@ -646,27 +646,27 @@ LRESULT CALLBACK HistoryProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             GetClientRect(hWnd, &rect);
             int x = LOWORD(lParam);
             int y = HIWORD(lParam);
-            
+
             // Handle active column resizing
             if (gHistoryResizingColumn >= 0 && gHistoryResizingColumn < HISTORY_COLUMNS) {
                 // Calculate column positions using helper
                 int colPositions[HISTORY_COLUMNS + 1];
                 CalculateColumnPositions(rect.right, colPositions);
-                
+
                 // Calculate new width for the column being resized
                 int newWidth = x - colPositions[gHistoryResizingColumn];
                 if (newWidth < 50) newWidth = 50;  // minimum column width
                 if (newWidth > 400) newWidth = 400;  // maximum column width
-                
+
                 gHistoryColumnWidths[gHistoryResizingColumn] = newWidth;
                 InvalidateRect(hWnd, NULL, TRUE);
                 return 0;
             }
-            
+
             // Calculate column positions for hover detection using helper
             int colPositions[HISTORY_COLUMNS + 1];
             CalculateColumnPositions(rect.right, colPositions);
-            
+
             // Check if over a column divider
             int overDivider = -1;
             for (int i = 1; i < HISTORY_COLUMNS; i++) {
@@ -676,26 +676,26 @@ LRESULT CALLBACK HistoryProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
                     break;
                 }
             }
-            
+
             if (overDivider >= 0) {
                 SetCursor(LoadCursor(NULL, IDC_SIZEWE));
             } else {
                 SetCursor(LoadCursor(NULL, IDC_ARROW));
                 int newHoverIndex = GetHistoryItemAtPoint(x, y, &rect);
-                
+
                 if (newHoverIndex != gHistoryHoverIndex) {
                     gHistoryHoverIndex = newHoverIndex;
                     InvalidateRect(hWnd, NULL, TRUE);
                 }
             }
-            
+
             // Track mouse leave to clear hover state when mouse exits window
             TRACKMOUSEEVENT tme;
             tme.cbSize = sizeof(TRACKMOUSEEVENT);
             tme.dwFlags = TME_LEAVE;
             tme.hwndTrack = hWnd;
             TrackMouseEvent(&tme);
-            
+
             return 0;
         }
         case WM_MOUSELEAVE: {
@@ -710,11 +710,11 @@ LRESULT CALLBACK HistoryProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             GetClientRect(hWnd, &rect);
             int x = LOWORD(lParam);
             int y = HIWORD(lParam);
-            
+
             // Calculate column positions using helper
             int colPositions[HISTORY_COLUMNS + 1];
             CalculateColumnPositions(rect.right, colPositions);
-            
+
             // Check if clicking on a column divider
             for (int i = 1; i < HISTORY_COLUMNS; i++) {
                 int dividerX = colPositions[i];
@@ -724,20 +724,20 @@ LRESULT CALLBACK HistoryProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
                     return 0;
                 }
             }
-            
+
             int clickedIndex = GetHistoryItemAtPoint(x, y, &rect);
-            
+
             if (clickedIndex >= 0 && clickedIndex < gHistoryCount) {
                 // Extract just the equation part (before the '=')
                 char equation[256];
                 strncpy(equation, gHistory[clickedIndex].equation, sizeof(equation) - 1);
                 equation[sizeof(equation) - 1] = '\0';
-                
+
                 // Find the '=' and truncate there
                 char* equalSign = strstr(equation, " = ");
                 if (equalSign)
                     *equalSign = '\0';
-                
+
                 SetWindowText(hInput, equation);
                 SetWindowText(hOutput, "");
                 FocusOnInput();
@@ -758,11 +758,11 @@ LRESULT CALLBACK HistoryProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             POINT pt;
             GetCursorPos(&pt);
             ScreenToClient(hWnd, &pt);
-            
+
             // Calculate column positions using helper
             int colPositions[HISTORY_COLUMNS + 1];
             CalculateColumnPositions(rect.right, colPositions);
-            
+
             // Check if over a column divider
             for (int i = 1; i < HISTORY_COLUMNS; i++) {
                 int dividerX = colPositions[i];
@@ -979,7 +979,7 @@ LRESULT CALLBACK InputProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 // ready output rendering
                 FormatOutput(buffer, result, result_str);
                 SetWindowText(hOutput, result_str);
-                
+
                 // Add to history
                 char historyEntry[512];
                 snprintf(historyEntry, sizeof(historyEntry), "%s = %s", buffer, result_str);
@@ -1073,7 +1073,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             // fire constantly, so allocating per message would churn GDI.
             hBackdropBrush = CreateSolidBrush(PAL_BACKDROP);
             hFieldBrush    = CreateSolidBrush(PAL_FIELD);
-            
+
             // create input edit control
             hInput = CreateWindow("EDIT", "",
                 WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
@@ -1151,7 +1151,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             AddButton(hwnd, "+/-", margin + 180, 160, 35);
             AddButton(hwnd, "=",   margin + 180, 200, ID_EQUAL);
             hClearHistBtn = AddButton(hwnd, "Clear\r\nHist.", margin + 220, 200, ID_CLEAR_HISTORY);
-            
+
             // Create smaller font for Clear Hist. button (2pt smaller than default)
             hSmallFont = CreateFont(
                 -10,                        // Height (negative for character height)
@@ -1319,12 +1319,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     // ready output rendering
                     FormatOutput(buffer, result, result_str);
                     SetWindowText(hOutput, result_str);  // show result
-                    
+
                     // Add to history
                     char historyEntry[512];
                     snprintf(historyEntry, sizeof(historyEntry), "%s = %s", buffer, result_str);
                     AddToHistory(historyEntry);
-                    
+
                     FocusOnInput();
                 }
             }
@@ -1417,22 +1417,22 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             if (hInput && hOutput) {
                 int width = LOWORD(lParam);
                 int height = HIWORD(lParam);
-                
+
                 // Use equal margins on left, right, and bottom
                 int margin = 10;
-                
+
                 // Update history panel visibility
                 UpdateHistoryVisibility(width);
-                
+
                 // Calculate available width for calculator
                 int calcWidth = 280;  // fixed calculator width
                 int availableWidth = width - (2 * margin);
-                
+
                 if (width >= HISTORY_MIN_WIDTH && hHistory) {
                     // Show history panel on the right - use available space
                     int historyWidth = width - calcWidth - (3 * margin);
                     int historyX = calcWidth + (2 * margin);
-                    
+
                     MoveWindow(hInput, margin, 10, calcWidth, 25, TRUE);
                     MoveWindow(hOutput, margin, 40, calcWidth, 25, TRUE);
                     MoveWindow(hHistory, historyX, 10, historyWidth, height - 20, TRUE);
@@ -1443,7 +1443,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     MoveWindow(hInput, margin, 10, availableWidth, 25, TRUE);
                     MoveWindow(hOutput, margin, 40, availableWidth, 25, TRUE);
                 }
-                
+
                 // Buttons remain fixed position
             }
             break;
@@ -1510,12 +1510,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     // ready output rendering
                     FormatOutput(buffer, result, result_str);
                     SetWindowText(hOutput, result_str);  // show result
-                    
+
                     // Add to history
                     char historyEntry[512];
                     snprintf(historyEntry, sizeof(historyEntry), "%s = %s", buffer, result_str);
                     AddToHistory(historyEntry);
-                    
+
                     dec = 0;
                     equ = 1;
                 }
@@ -1548,7 +1548,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             if (hHistory) {
                 hHistory = NULL;
             }
-            
+
             PostQuitMessage(0);  // exit message loop
             break;
         }
@@ -1578,7 +1578,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdSh
     // RegisterClassEx wires up our message handler and appearance. Without it,
     // CreateWindow would fail because the class name would be unknown to the OS.
     RegisterClassEx(&wc);
-    
+
     // Register history panel window class
     WNDCLASSEX histWc = { 0 };
     histWc.cbSize = sizeof(WNDCLASSEX);
@@ -1599,7 +1599,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdSh
     AdjustWindowRect(&rect, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME | WS_MAXIMIZEBOX, FALSE);
     int windowWidth = rect.right - rect.left;
     int windowHeight = rect.bottom - rect.top;
-    
+
     HWND hwnd = CreateWindow("CalcGUI", "ccal",
                 WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME | WS_MAXIMIZEBOX,
                 CW_USEDEFAULT, CW_USEDEFAULT, windowWidth, windowHeight,

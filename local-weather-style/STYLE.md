@@ -134,10 +134,10 @@ than the text - the weather reads through the backdrop, not through the copy.
 4. Set the precipitation texture flag to match the directive.
 5. Rebuild:
 
-   ```bash
-   windres ccal_gui.rc -O coff -o ccal_gui.res
-   gcc -DBUILDING_GUI ccal_gui.c ccal.c ccal_gui.res -o ccal_gui.exe -mwindows
-   ```
+```bash
+windres ccal_gui.rc -O coff -o ccal_gui.res
+gcc -DBUILDING_GUI ccal_gui.c ccal.c ccal_gui.res -o ccal_gui.exe -mwindows
+```
 
 6. Launch `ccal_gui.exe` and confirm the contrast floor holds.
 
