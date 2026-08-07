@@ -20,6 +20,38 @@ extern double evaluate_expr_string(const char* expr, int* error);
 // GLOBAL ELEMENTS:
 //////////////////////////////////////////////////////////////////////////////
 
+// LOCAL WEATHER PALETTE:
+//////////////////////////////////////////////////////////////////////////////
+// Generated for render_weather directives: background day, tone hot,
+// precipitation stormy. See local-weather-style/STYLE.md for the contract.
+// A restyle rewrites only this block; no RGB() literal belongs anywhere else.
+//
+// Read as a hot afternoon that a storm has rolled over: the ember hues stay,
+// but overcast pulls the saturation down and drops a cool rain cast on top.
+
+#define PAL_BACKDROP       RGB(122, 110, 112)  // overcast daylight, warm cast
+#define PAL_PANEL          RGB(214, 199, 188)  // sunbleached panel, still light
+#define PAL_TEXT           RGB( 38,  32,  34)  // near-black, warm
+#define PAL_TEXT_ON_ACCENT RGB(255, 244, 232)  // warm white for accent fills
+#define PAL_HOVER          RGB(244, 206, 166)  // low amber wash
+#define PAL_HOVER_EDGE     RGB(178,  86,  44)  // ember outline
+#define PAL_DIVIDER        RGB( 74,  64,  70)  // deep storm gray
+#define PAL_BTN_FACE       RGB(198, 180, 170)  // warm stone, digits
+#define PAL_BTN_OP         RGB(176, 132, 104)  // scorched clay, operators
+#define PAL_BTN_ACCENT     RGB(176,  74,  38)  // ember, the "=" key
+#define PAL_BTN_PRESSED    RGB(132,  96,  84)  // pressed state, any button
+#define PAL_FIELD          RGB(232, 222, 210)  // input and result background
+#define PAL_PRECIP         RGB(104,  96, 108)  // rain streak, near backdrop
+
+// Precipitation texture: 1 draws PAL_PRECIP streaks across the backdrop.
+// Set for "stormy"; clear for "cloudy" and "sunny".
+#define PAL_PRECIP_STREAKS 1
+
+// Cached brushes, created in WM_CREATE and released in WM_DESTROY so the
+// paint paths never allocate per message.
+static HBRUSH hBackdropBrush = NULL;
+static HBRUSH hFieldBrush    = NULL;
+
 // Control IDs for window elements.
 #define ID_INPUT   1
 #define ID_OUTPUT  2
@@ -496,7 +528,7 @@ static int GetHistoryItemAtPoint(int x, int y, RECT* clientRect) {
 // Draw history panel
 static void DrawHistory(HDC hdc, RECT* rect) {
     // Fill background
-    HBRUSH bgBrush = CreateSolidBrush(RGB(245, 245, 245));
+    HBRUSH bgBrush = CreateSolidBrush(PAL_PANEL);
     FillRect(hdc, rect, bgBrush);
     DeleteObject(bgBrush);
     
@@ -511,7 +543,7 @@ static void DrawHistory(HDC hdc, RECT* rect) {
     }
     
     SetBkMode(hdc, TRANSPARENT);
-    SetTextColor(hdc, RGB(0, 0, 0));
+    SetTextColor(hdc, PAL_TEXT);
     
     int availableHeight = rect->bottom - rect->top;
     int rowsPerCol = (availableHeight - 10) / HISTORY_ITEM_HEIGHT;  // Dynamic row calculation
@@ -540,11 +572,11 @@ static void DrawHistory(HDC hdc, RECT* rect) {
         
         // Highlight on hover
         if (itemIndex == gHistoryHoverIndex) {
-            HBRUSH hoverBrush = CreateSolidBrush(RGB(220, 235, 255));
+            HBRUSH hoverBrush = CreateSolidBrush(PAL_HOVER);
             FillRect(hdc, &itemRect, hoverBrush);
             DeleteObject(hoverBrush);
-            
-            HPEN borderPen = CreatePen(PS_SOLID, 1, RGB(100, 150, 200));
+
+            HPEN borderPen = CreatePen(PS_SOLID, 1, PAL_HOVER_EDGE);
             HPEN oldPen = (HPEN)SelectObject(hdc, borderPen);
             Rectangle(hdc, itemRect.left - 1, itemRect.top - 1, itemRect.right + 1, itemRect.bottom + 1);
             SelectObject(hdc, oldPen);
@@ -555,7 +587,7 @@ static void DrawHistory(HDC hdc, RECT* rect) {
     }
     
     // Draw column dividers
-    HPEN dividerPen = CreatePen(PS_SOLID, 1, RGB(47, 79, 79));  // darkslategray
+    HPEN dividerPen = CreatePen(PS_SOLID, 1, PAL_DIVIDER);  // deep storm gray
     HPEN oldPen = (HPEN)SelectObject(hdc, dividerPen);
     for (int i = 1; i < HISTORY_COLUMNS; i++) {
         int x = colPositions[i];
@@ -749,10 +781,74 @@ LRESULT CALLBACK HistoryProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 HWND AddButton(HWND parent, const char* label, int x, int y, int id) {
     // Buttons are child windows too, so we pass the parent handle and position
     // in client coordinates to keep layout relative to the calculator frame.
+    // BS_OWNERDRAW routes painting through WM_DRAWITEM so the weather palette
+    // applies. The system theme would otherwise repaint over any colour we set.
     return CreateWindow("BUTTON", label,
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_MULTILINE,
+        WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | BS_MULTILINE,
         x, y, 40, 30,
         parent, (HMENU)(intptr_t)id, NULL, NULL);
+}
+
+// Pick a button face colour from the control ID. Digits read as warm stone,
+// operators as scorched clay, and "=" carries the ember accent.
+static COLORREF ButtonFaceColor(int id) {
+    if (id == ID_EQUAL)
+        return PAL_BTN_ACCENT;
+    if (id == ID_CLEAR_HISTORY || id == 20)   // "Clear Hist." and "c"
+        return PAL_BTN_OP;
+    if (id >= 30 && id <= 35)                 // operators and "+/-"
+        return PAL_BTN_OP;
+    return PAL_BTN_FACE;                      // digits and "."
+}
+
+// Paint one owner-drawn button for the current weather palette.
+static void DrawWeatherButton(LPDRAWITEMSTRUCT dis) {
+    int pressed = (dis->itemState & ODS_SELECTED) != 0;
+    COLORREF face = pressed ? PAL_BTN_PRESSED : ButtonFaceColor((int)dis->CtlID);
+
+    // Light copy only where the fill is dark enough to need it; the stone and
+    // clay faces stay legible with the standard dark text.
+    COLORREF ink = (pressed || face == PAL_BTN_ACCENT)
+        ? PAL_TEXT_ON_ACCENT : PAL_TEXT;
+
+    HBRUSH faceBrush = CreateSolidBrush(face);
+    FillRect(dis->hDC, &dis->rcItem, faceBrush);
+    DeleteObject(faceBrush);
+
+    // A single hairline keeps the keys separated against the stormy backdrop.
+    HPEN edgePen = CreatePen(PS_SOLID, 1, PAL_DIVIDER);
+    HPEN oldPen = (HPEN)SelectObject(dis->hDC, edgePen);
+    HBRUSH oldBrush = (HBRUSH)SelectObject(dis->hDC, GetStockObject(NULL_BRUSH));
+    Rectangle(dis->hDC, dis->rcItem.left, dis->rcItem.top,
+              dis->rcItem.right, dis->rcItem.bottom);
+    SelectObject(dis->hDC, oldBrush);
+    SelectObject(dis->hDC, oldPen);
+    DeleteObject(edgePen);
+
+    char label[64];
+    GetWindowText(dis->hwndItem, label, sizeof(label));
+
+    SetBkMode(dis->hDC, TRANSPARENT);
+    SetTextColor(dis->hDC, ink);
+
+    // "Clear Hist." wraps onto two lines, so measure first and centre the
+    // block by hand. DT_VCENTER only works for single-line text.
+    RECT textRect = dis->rcItem;
+    RECT calcRect = dis->rcItem;
+    DrawText(dis->hDC, label, -1, &calcRect, DT_CENTER | DT_WORDBREAK | DT_CALCRECT);
+    int textHeight = calcRect.bottom - calcRect.top;
+    int boxHeight = dis->rcItem.bottom - dis->rcItem.top;
+    if (textHeight < boxHeight)
+        textRect.top += (boxHeight - textHeight) / 2;
+
+    DrawText(dis->hDC, label, -1, &textRect, DT_CENTER | DT_WORDBREAK);
+
+    // Keyboard focus still needs to be visible now that the theme is gone.
+    if (dis->itemState & ODS_FOCUS) {
+        RECT focusRect = dis->rcItem;
+        InflateRect(&focusRect, -3, -3);
+        DrawFocusRect(dis->hDC, &focusRect);
+    }
 }
 
 // Set focus on input area to always allow keyboard use.
@@ -972,6 +1068,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             // later in initialization.
             // Use consistent margin for left, right, and bottom
             int margin = 10;
+
+            // Cache the palette brushes once. WM_CTLCOLOR* and WM_ERASEBKGND
+            // fire constantly, so allocating per message would churn GDI.
+            hBackdropBrush = CreateSolidBrush(PAL_BACKDROP);
+            hFieldBrush    = CreateSolidBrush(PAL_FIELD);
             
             // create input edit control
             hInput = CreateWindow("EDIT", "",
@@ -1080,6 +1181,61 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
             break;
         }
+        // paint owner-drawn buttons with the weather palette
+        case WM_DRAWITEM: {
+            LPDRAWITEMSTRUCT dis = (LPDRAWITEMSTRUCT)lParam;
+            if (dis->CtlType == ODT_BUTTON) {
+                DrawWeatherButton(dis);
+                return TRUE;
+            }
+            break;
+        }
+
+        // colour the input edit control
+        case WM_CTLCOLOREDIT: {
+            HDC hdcCtl = (HDC)wParam;
+            SetTextColor(hdcCtl, PAL_TEXT);
+            SetBkColor(hdcCtl, PAL_FIELD);
+            return (LRESULT)hFieldBrush;
+        }
+
+        // colour the result label, which is a STATIC control
+        case WM_CTLCOLORSTATIC: {
+            HDC hdcCtl = (HDC)wParam;
+            SetTextColor(hdcCtl, PAL_TEXT);
+            SetBkColor(hdcCtl, PAL_FIELD);
+            return (LRESULT)hFieldBrush;
+        }
+
+        // paint the backdrop, plus rain streaks when the weather is stormy
+        case WM_ERASEBKGND: {
+            HDC hdcBg = (HDC)wParam;
+            RECT client;
+            GetClientRect(hwnd, &client);
+            if (!hBackdropBrush)
+                break;  // fall through to DefWindowProc before WM_CREATE runs
+            FillRect(hdcBg, &client, hBackdropBrush);
+
+#if PAL_PRECIP_STREAKS
+            // Faint diagonal streaks sit a few steps off the backdrop so they
+            // read as weather without competing with the button labels.
+            HPEN rainPen = CreatePen(PS_SOLID, 1, PAL_PRECIP);
+            HPEN oldRainPen = (HPEN)SelectObject(hdcBg, rainPen);
+            const int spacing = 14;   // gap between streaks
+            const int slant = 7;      // horizontal run over the streak height
+            const int length = 18;    // streak height
+            for (int y = -length; y < client.bottom; y += spacing) {
+                for (int x = -slant; x < client.right + slant; x += spacing * 3) {
+                    MoveToEx(hdcBg, x, y, NULL);
+                    LineTo(hdcBg, x + slant, y + length);
+                }
+            }
+            SelectObject(hdcBg, oldRainPen);
+            DeleteObject(rainPen);
+#endif
+            return TRUE;
+        }
+
         // handle button press
         case WM_COMMAND: {
             // WM_COMMAND consolidates button clicks and accelerator actions.
@@ -1377,7 +1533,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 DeleteObject(hSmallFont);
                 hSmallFont = NULL;
             }
-            
+
+            // Release the cached palette brushes
+            if (hBackdropBrush) {
+                DeleteObject(hBackdropBrush);
+                hBackdropBrush = NULL;
+            }
+            if (hFieldBrush) {
+                DeleteObject(hFieldBrush);
+                hFieldBrush = NULL;
+            }
+
             // Child windows are automatically destroyed, but we clear the handle
             if (hHistory) {
                 hHistory = NULL;
@@ -1406,7 +1572,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdSh
     wc.hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_ICON1));
     wc.hIconSm = LoadIcon(hInst, MAKEINTRESOURCE(IDI_ICON1));
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    // No class brush: WM_ERASEBKGND paints the weather backdrop itself, and a
+    // system brush here would flash the default grey before the storm lands.
+    wc.hbrBackground = NULL;
     // RegisterClassEx wires up our message handler and appearance. Without it,
     // CreateWindow would fail because the class name would be unknown to the OS.
     RegisterClassEx(&wc);
@@ -1418,7 +1586,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdSh
     histWc.hInstance = hInst;
     histWc.lpszClassName = "HistoryPanel";
     histWc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    histWc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    // HistoryProc suppresses WM_ERASEBKGND and DrawHistory fills the whole
+    // client rect, so the class needs no brush of its own.
+    histWc.hbrBackground = NULL;
     RegisterClassEx(&histWc);
 
     // create main window
